@@ -6,19 +6,28 @@
 #include <algorithm>
 #include <list>
 #include <utility>
-#include <cmath>  
+#include <cmath>
+#include <boost/iostreams/device/file.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/gzip.hpp>    
+
+namespace io = boost::iostreams;
+
 #include "MatchUtils.hpp"
 
-int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, bool gfa)
+int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, bool gfa)
 {
 	using namespace std;
+    io::filtering_istream in_filter;
+    in_filter.push(io::gzip_decompressor());
+    in_filter.push(io::file_source(file_name));
 
-	ifstream inputFile_filter(file_name);
+	//ifstream inputFile_filter(file_name);
 	string line;
     set<string> to_drop;
     cerr << "Checking for Contained Reads" << endl;
     int count = 0;
-	while (getline(inputFile_filter, line))
+	while (getline(in_filter, line, '\n'))
 	{
 		istringstream lin(line);
     	string c1, c6, meta, cg;
@@ -37,15 +46,23 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 	        to_drop.insert(tmpLine.target_read_id);
 	    } else if (contained == -1 && to_drop.count(tmpLine.query_read_id) == 0) {
 	        to_drop.insert(tmpLine.query_read_id);
-	    }	
+	    }
+        if(chimeric_reads.count(c1) != 0){
+            to_drop.insert(c1);
+        }
+        if(chimeric_reads.count(c6) != 0){
+            to_drop.insert(c6);
+        }
     }
 	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
 	cerr << "Reading in all valid Matches" << endl;
-	ifstream inputFile(file_name);
+	io::filtering_istream in;
+    in.push(io::gzip_decompressor());
+    in.push(io::file_source(file_name));
     count = 0;
     vector<int> sizes;
     read_ids.clear();
-	while (getline(inputFile, line))
+	while (getline(in, line, '\n'))
 	{
         // Each line of input is split into columns
         // Each line coresponds to a called overlap
@@ -54,12 +71,12 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
     	char c5;
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
-        getline(lin, meta);
-        size_t idx = meta.find("cg:");
+        //getline(lin, meta);
+        //size_t idx = meta.find("cg:");
         cg = "";
-        if(idx != string::npos){
-            cg = meta.substr(idx+5);
-        }
+        //if(idx != string::npos){
+        //    cg = meta.substr(idx+5);
+        //}
         //cerr << cg << endl;
         // Check for self alignments && contained reads
         if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
@@ -69,7 +86,7 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
             continue;
         }
         // Match is not long enough
-        if(c10 < 100){
+        if((c4 - c3) < 2000 || (c9 - c8) < 2000 || c10 < 100){
         	//cerr << c4 - c3 << " " << c8 - c7  << endl;
             count++;
         	continue;

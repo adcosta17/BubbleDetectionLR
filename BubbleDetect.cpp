@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 #include <sstream>
 #include <fstream>
 #include <algorithm>
@@ -11,12 +12,45 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-    // Check for correct number or agruments, Assume that Input file provided is in correct format
-    if(argc != 6 && argc != 8){
-        cerr << "ERROR: INCORRECT NUMBER OF FILE NAMES & PARAMETERS PROVIDED" << endl;
-        cerr << "Usage: BubbleDetect Paf_Input_File.paf Gfa_Output_File.gfa Iterations# fuzz threshold (optional) read_classification_file (optional) species_to_colour_map" << endl;
+    bool exit = false;
+    bool tax = false;
+    bool col = false;
+    bool chimeric = false;
+    bool group = false;
+    int opt, iterations, fuzz, threshold;
+    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file;
+    while ((opt = getopt(argc,argv,"p:g:i:f:t:r:s:c:x")) != EOF)
+    {
+        switch(opt)
+        {
+            case 'p': pafFile = optarg; break;
+            case 'g': outputFileName = optarg; break;
+            case 'r': taxonomy_file = optarg; tax = true; break;
+            case 's': colour_file = optarg; col = true; break;
+            case 'c': chimeric_read_file = optarg; chimeric = true; break;
+            case 'i': iterations = atoi(optarg); break;
+            case 'f': fuzz = atoi(optarg); break;
+            case 't': threshold = atoi(optarg); break;
+            case 'x': group = true; break;
+            case '?': exit = true; break;
+            default: exit=true;
+        }
+    }
+    if (optind < argc) {
+        exit = true;
+        cerr << "Non-option argument: ";
+        while (optind < argc)
+            cerr << argv[optind++];
+        cerr << endl;
+    }
+    if(argc == 1){
+        exit = true;
+    }
+    if(exit){
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -g Gfa_Output_File.gfa\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -x group by species [False]\n (optional) -r read_classification_file\n (optional) -s species_to_colour_map\n (optional) -c chimeric_read_map\n";
         return 0;
     }
+
     // Read in and Parse input file
 	map<string, vector<Match> > all_matches;
     map<string, vector<Match> > raw_matches;
@@ -24,17 +58,29 @@ int main(int argc, char** argv)
     map<string, vector<Match> > edge_lists;
     set<string> read_ids;
     map<string, int> read_lengths;
-    string fname = argv[2];
+    set<string> chimeric_reads;
+
+    if(chimeric){
+        ifstream inputFileChimeric(chimeric_read_file);
+        string line;
+        while (getline(inputFileChimeric, line))
+        {
+            istringstream lin(line);
+            string id, classification;
+            lin >> classification >> id;
+            if(classification == "Chimeric"){
+                chimeric_reads.insert(id);
+            }
+        }
+    }
+
     cerr << "Parsing Paf Input File" << endl;
-    int iterations = atoi(argv[3]);
-    int mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, argv[1], true);
+    int mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, true);
     cerr << read_ids.size() << " Unique Reads found in File"<< endl;
     cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
     map<string, vector<string> > read_indegree; // Number of times read is target
     map<string, vector<string> > read_outdegree;
-    // Myers Transitive Reduction Alg
-    int fuzz = atoi(argv[4]);
-    int threshold = atoi(argv[5]);
+    
     map<string, string> read_names;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             read_names.insert(make_pair(*it, *it));
@@ -43,28 +89,28 @@ int main(int argc, char** argv)
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
-    if(argc == 8){
+    map<string, vector<string> > read_taxonomy;
+    if(tax){
         cerr << "Taxonomy File Detected" << endl;
-        string taxonomy_file = argv[6];
-        string colour_file = argv[7];
-
-        ifstream inputFile_colour(colour_file);
-        string line;
         map<string, string> species_map;
-        while (getline(inputFile_colour, line))
-        {
-            stringstream data(line);
-            string level;
-            vector<string> result;
-            while(getline(data,level,'\t'))
+        if(col){
+            ifstream inputFile_colour(colour_file);
+            string line;
+            while (getline(inputFile_colour, line))
             {
-                result.push_back(level);
+                stringstream data(line);
+                string level;
+                vector<string> result;
+                while(getline(data,level,'\t'))
+                {
+                    result.push_back(level);
+                }
+                if(result.size() > 1){
+                    species_map[result[0]] = result[1];
+                }
             }
-            if(result.size() > 1){
-                species_map[result[0]] = result[1];
-            }
+            cerr << "Assigning Levels and Colours to Reads" << endl;
         }
-        cerr << "Assigning Levels and Colours to Reads" << endl;
         ifstream inputFile_filter(taxonomy_file);
         while (getline(inputFile_filter, line))
         {   
@@ -74,23 +120,51 @@ int main(int argc, char** argv)
             getline(lin, classification);
             stringstream  data(classification);
             vector<string> result;
-            while(getline(data,level,';'))
+            while(getline(data,level,'|'))
             {
                 result.push_back(level);
             }
             read_names[id] = read_names[id] + " : " + result[result.size() - 1];
-            for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it){
-                if (result[result.size() - 1].find(it->first) != std::string::npos){
-                    colours[id] = it->second;
-                    break;
+            read_taxonomy.insert(make_pair(id, result));
+            if(col){
+                for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it){
+                    if (result[result.size() - 1].find(it->first) != std::string::npos){
+                        colours[id] = it->second;
+                        break;
+                    }
                 }
             }
         }
+
+        if(group){
+
+        	// Default is to group by species, done only if we see taxonomy file
+            // Read in Taxonomy file, and store each classification level for each read if possible
+            // Can query struct or map for all reads with level equal to x
+            // Store list of all seen species 
+
+            // first get a list of all unique speces, and their counts,
+            // Sort from least to greatest in terms of count
+            // For each in this order assemble             
+            map<vector<string>, int> species_count;
+            for(map<string, vector<string> >::iterator it=read_taxonomy.begin(); it!= read_taxonomy.end(); ++it){
+                if(it->second[it->second.size() - 1].at(0) == 's'){
+                    if(species_count.count(it->second) == 0){
+                        species_count.insert(make_pair(it->second, 0));
+                    }
+                    species_count[it->second] += 1;
+                }
+            }
+            
+        	return 0;
+        }
     }
+
+    // Myers Transitive Reduction Alg
     cerr << "Reducing Edges" << endl;
     MatchUtils::reduce_edges(all_matches, read_ids, edge_lists, fuzz);
     MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-    string tmp_name = fname + "reduced";
+    string tmp_name = outputFileName + "reduced";
     MatchUtils::toGfa(all_matches,read_lengths, tmp_name, read_indegree, read_outdegree, read_names, colours);
     
     //Clean up all_matches and then the edge_lists
@@ -112,7 +186,7 @@ int main(int argc, char** argv)
     read_indegree.clear();
     read_outdegree.clear();
     MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-    tmp_name = fname + "pruned";
+    tmp_name = outputFileName + "pruned";
     MatchUtils::toGfa(all_matches,read_lengths, tmp_name, read_indegree, read_outdegree, read_names, colours);
 
     cerr << "Compute Possible Bubbles" << endl;
