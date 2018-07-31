@@ -18,8 +18,8 @@ int main(int argc, char** argv)
     bool chimeric = false;
     bool group = false;
     int opt, iterations, fuzz, threshold;
-    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file;
-    while ((opt = getopt(argc,argv,"p:g:i:f:t:r:s:c:x")) != EOF)
+    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, group_level;
+    while ((opt = getopt(argc,argv,"p:g:i:f:t:r:s:c:x:")) != EOF)
     {
         switch(opt)
         {
@@ -31,7 +31,7 @@ int main(int argc, char** argv)
             case 'i': iterations = atoi(optarg); break;
             case 'f': fuzz = atoi(optarg); break;
             case 't': threshold = atoi(optarg); break;
-            case 'x': group = true; break;
+            case 'x': group_level = optarg; group_level = group_level + "__"; group = true; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -47,7 +47,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -g Gfa_Output_File.gfa\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -x group by species [False]\n (optional) -r read_classification_file\n (optional) -s species_to_colour_map\n (optional) -c chimeric_read_map\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -g Gfa_Output_File.gfa\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -x group by level [s: species, g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read_classification_file\n (optional) -s species_to_colour_map\n (optional) -c chimeric_read_map\n";
         return 0;
     }
 
@@ -89,13 +89,13 @@ int main(int argc, char** argv)
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
-    map<string, vector<string> > read_taxonomy;
+    map<string, string> read_taxonomy;
     if(tax){
         cerr << "Taxonomy File Detected" << endl;
         map<string, string> species_map;
+        string line;
         if(col){
             ifstream inputFile_colour(colour_file);
-            string line;
             while (getline(inputFile_colour, line))
             {
                 stringstream data(line);
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
                 vector<string> result;
                 while(getline(data,level,'\t'))
                 {
-                    result.push_back(level);
+                    result.push_back(level.substr(3));
                 }
                 if(result.size() > 1){
                     species_map[result[0]] = result[1];
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
                 result.push_back(level);
             }
             read_names[id] = read_names[id] + " : " + result[result.size() - 1];
-            read_taxonomy.insert(make_pair(id, result));
+            read_taxonomy.insert(make_pair(id, classification));
             if(col){
                 for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it){
                     if (result[result.size() - 1].find(it->first) != std::string::npos){
@@ -146,17 +146,22 @@ int main(int argc, char** argv)
             // first get a list of all unique speces, and their counts,
             // Sort from least to greatest in terms of count
             // For each in this order assemble             
-            map<vector<string>, int> species_count;
-            for(map<string, vector<string> >::iterator it=read_taxonomy.begin(); it!= read_taxonomy.end(); ++it){
-                if(it->second[it->second.size() - 1].at(0) == 's'){
-                    if(species_count.count(it->second) == 0){
-                        species_count.insert(make_pair(it->second, 0));
-                    }
-                    species_count[it->second] += 1;
-                }
+            map<string, int> species_count;
+            for(map<string, string>::iterator it=read_taxonomy.begin(); it!= read_taxonomy.end(); ++it){
+                //if (it->second.find(group_level) != std::string::npos) {
+                    // Know this read is classified to at least the level requested
+                    // Need to then narrow 
+
+                //}
+                //if(it->second[it->second.size() - 1].at(0) == 's'){
+                //    if(species_count.count(it->second) == 0){
+                //        species_count.insert(make_pair(it->second, 0));
+                //    }
+                //    species_count[it->second] += 1;
+                //}
             }
-            
-        	return 0;
+
+        	//return 0;
         }
     }
 
