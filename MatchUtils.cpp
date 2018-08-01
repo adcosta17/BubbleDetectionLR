@@ -15,7 +15,7 @@ namespace io = boost::iostreams;
 
 #include "MatchUtils.hpp"
 
-int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, bool gfa)
+int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
 {
 	using namespace std;
     io::filtering_istream in_filter;
@@ -126,6 +126,14 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 
 	        read_ids.insert(c1);
 	        read_ids.insert(c6);
+            if(read_classification.count(c1) == 0){
+                Read tmp = Read(c1, c2);
+                read_classification.insert(make_pair(c1, tmp));
+            }
+            if(read_classification.count(c6) == 0){
+                Read tmp = Read(c6, c7);
+                read_classification.insert(make_pair(c6, tmp));
+            }
 	        if(read_lengths.count(c1) == 0){
 	            read_lengths.insert(pair<string, int>(c1, c2));
                 sizes.push_back(c2);

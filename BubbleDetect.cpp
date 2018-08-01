@@ -6,6 +6,7 @@
 #include <regex>
 #include <cstdlib>
 #include "MatchUtils.hpp"
+#include "Read.hpp"
 
 using namespace std;
 
@@ -18,8 +19,9 @@ int main(int argc, char** argv)
     bool chimeric = false;
     bool group = false;
     int opt, iterations, fuzz, threshold;
-    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, group_level;
-    while ((opt = getopt(argc,argv,"p:g:i:f:t:r:s:c:x:")) != EOF)
+    char group_level = 's';
+    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, mpa_file;
+    while ((opt = getopt(argc,argv,"p:g:i:f:t:r:s:c:x:m:")) != EOF)
     {
         switch(opt)
         {
@@ -31,7 +33,8 @@ int main(int argc, char** argv)
             case 'i': iterations = atoi(optarg); break;
             case 'f': fuzz = atoi(optarg); break;
             case 't': threshold = atoi(optarg); break;
-            case 'x': group_level = optarg; group_level = group_level + "__"; group = true; break;
+            case 'm': mpa_file = optarg; group = true; break;
+            case 'x': group_level = atoc(optarg); break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -47,7 +50,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -g Gfa_Output_File.gfa\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -x group by level [s: species, g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read_classification_file\n (optional) -s species_to_colour_map\n (optional) -c chimeric_read_map\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -g Gfa_Output_File.gfa\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read_classification_file\n (optional) -s species_to_colour_map\n (optional) -c chimeric_read_map\n";
         return 0;
     }
 
@@ -59,6 +62,7 @@ int main(int argc, char** argv)
     set<string> read_ids;
     map<string, int> read_lengths;
     set<string> chimeric_reads;
+    map<string, Read> read_classification;
 
     if(chimeric){
         ifstream inputFileChimeric(chimeric_read_file);
@@ -75,7 +79,7 @@ int main(int argc, char** argv)
     }
 
     cerr << "Parsing Paf Input File" << endl;
-    int mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, true);
+    int mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, true);
     cerr << read_ids.size() << " Unique Reads found in File"<< endl;
     cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
     map<string, vector<string> > read_indegree; // Number of times read is target
@@ -89,7 +93,7 @@ int main(int argc, char** argv)
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
-    map<string, string> read_taxonomy;
+    map<string, string> read_lowest_taxonomy;
     if(tax){
         cerr << "Taxonomy File Detected" << endl;
         map<string, string> species_map;
@@ -120,12 +124,12 @@ int main(int argc, char** argv)
             getline(lin, classification);
             stringstream  data(classification);
             vector<string> result;
-            while(getline(data,level,'|'))
+            while(getline(data,level,';'))
             {
                 result.push_back(level);
             }
             read_names[id] = read_names[id] + " : " + result[result.size() - 1];
-            read_taxonomy.insert(make_pair(id, classification));
+            read_lowest_taxonomy.insert(make_pair(id, result[result.size() - 1]));
             if(col){
                 for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it){
                     if (result[result.size() - 1].find(it->first) != std::string::npos){
@@ -145,7 +149,26 @@ int main(int argc, char** argv)
 
             // first get a list of all unique speces, and their counts,
             // Sort from least to greatest in terms of count
-            // For each in this order assemble             
+            // For each in this order assemble
+
+            // Need to read in mpa file to get 
+            ifstream inputFile_filter(mpa_file);
+            map<string, int> species_count;
+            while (getline(inputFile_filter, line))
+            {   
+                istringstream lin(line);
+                string id, classification, level;
+                lin >> id;
+                getline(lin, classification);
+                stringstream  data(classification);
+                vector<string> result;
+                while(getline(data,level,'|'))
+                {
+                    result.push_back(level);
+                }
+                read_classification[id].setTaxonomy(result);
+            }
+
             map<string, int> species_count;
             for(map<string, string>::iterator it=read_taxonomy.begin(); it!= read_taxonomy.end(); ++it){
                 //if (it->second.find(group_level) != std::string::npos) {

@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+
 class Read 
 {
 public:
@@ -13,14 +16,10 @@ public:
 	std::string species;
 
 	Read(std::string i,
-		int l,
-		std::string d,
-		std::string k,
-		std::string p,
-		std::string o,
-		std::string f,
-		std::string c,
-		std::string g,
-		std::string s);
+		int l);
+
+
+	void setTaxonomy(std::vector<std::string>& tmp);
+	std::string getClassification(char level);
 
 };

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include "MatchUtils.hpp"
+#include "Read.hpp"
 
 using namespace std;
 
@@ -46,8 +47,9 @@ int main(int argc, char** argv)
     map<string, vector<Match> > raw_matches;
     set<string> read_ids;
     set<string> chimeric_reads;
+    map<string, Read> read_classification;
     map<string, int> read_lengths;
-    MatchUtils::read_paf_file(id_map, all_matches, raw_matches, read_ids, read_lengths, argv[1], chimeric_reads, true);
+    MatchUtils::read_paf_file(id_map, all_matches, raw_matches, read_ids, read_lengths, argv[1], chimeric_reads, read_classification, true);
     string source_read = argv[2];
     int levels = atoi(argv[3]);
     set<string> ids;

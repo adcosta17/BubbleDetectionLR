@@ -1,0 +1,53 @@
+#include "Read.hpp"
+
+Read::Read(std::string i,
+		int l)
+	: id(i), length(l){
+		
+		domain = "";
+		kingdom = "";
+		phylum = "";
+		order = "";
+		family = "";
+		clas = "";
+		genus = "";
+		species = "";
+	}
+
+void Read::setTaxonomy(std::vector<std::string>& tmp){
+	for (int i = 0; i < tmp.size(); ++i)
+	{
+		char tax = tmp[i].at(0);
+		string val = tmp[i].substr(3);
+		switch(tax){
+			case 's': species = val; break;
+			case 'g': genus = val; break;
+			case 'f': family = val; break;
+			case 'o': order = val; break;
+			case 'c': clas = val; break;
+			case 'p': phylum = val; break;
+			case 'k': kingdom = val; break;
+			case 'd': domain = val; break;
+			default: break;
+		}
+	}
+}
+
+// Returns the read's full classification string from desired level up
+// If read doesn't have classification to that level it returns an empty string
+std::string Read::getClassification(char level){
+
+	switch(level){
+		case 's': {if(species != "") return getClassification('g') + " | " + species;} break;
+		case 'g': {if(genus != "") return getClassification('f') + " | " + genus;} break;
+		case 'f': {if(family != "") return getClassification('o') + " | " + family;} break;
+		case 'o': {if(order != "") return getClassification('c') + " | " + order;} break;
+		case 'c': {if(clas != "") return getClassification('p') + " | " + clas;} break;
+		case 'p': {if(phylum != "") return getClassification('k') + " | " + phylum;} break;
+		case 'k': {return getClassification('d') + " | " + kingdom;} break; // Kingdom can be empty for Bacteria
+		case 'd': return domain;
+		default: return "";
+	}
+
+	return "";
+}
