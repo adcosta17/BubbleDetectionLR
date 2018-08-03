@@ -17,4 +17,5 @@ class MatchUtils
 	static void prune_branch_dead_ends(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, int>& read_indegree, std::map<std::string, int>& read_outdegree,std::set<std::string>& read_ids);
 	static void clean_matches(std::map<std::string, std::vector<Match> >& all_matches);
 	static int mark_matches_for_node(std::map<std::string, std::vector<Match> >& all_matches, std::string id, std::map<std::string, int>& mark);
+	static void subset_matches(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& species_matches, std::map<std::string, std::vector<Match> >&  species_edge_lists, std::set<std::string> ids_to_use);
 };

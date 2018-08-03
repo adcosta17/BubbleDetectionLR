@@ -181,6 +181,37 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 }
 
 
+void MatchUtils::subset_matches(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& species_matches, std::map<std::string, std::vector<Match> >&  species_edge_lists, std::set<std::string> ids_to_use){
+    for (map<string, vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it)
+    {
+        for (int i = 0; i < it2->second.size(); ++i)
+        {
+            if(ids_to_use.count(it->second[i].query_read_id) > 0 && ids_to_use.count(it->second[i].target_read_id) > 0){
+                if(species_matches.count(it->first) == 0){
+                    vector<Match> tmp;
+                    species_matches.insert(pair<string, vector<Match> >(it->first,tmp));
+                }
+                species_matches[it->first].push_back(it->second[i]);
+            }
+        }
+    }
+
+    for (map<string, vector<Match> >::iterator it=edge_lists.begin(); it!=edge_lists.end(); ++it)
+    {
+        for (int i = 0; i < it2->second.size(); ++i)
+        {
+            if(ids_to_use.count(it->second[i].query_read_id) > 0 && ids_to_use.count(it->second[i].target_read_id) > 0){
+                if(species_edge_lists.count(it->first) == 0){
+                    vector<Match> tmp;
+                    species_edge_lists.insert(pair<string, vector<Match> >(it->first,tmp));
+                }
+                species_edge_lists[it->first].push_back(it->second[i]);
+            }
+        }
+    }
+}
+
+
 void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::map<std::pair<std::string,std::string>, std::set<std::string> >& bubble_sets, std::vector<std::string>& start_ids){
 
     std::set<std::string> visited;
