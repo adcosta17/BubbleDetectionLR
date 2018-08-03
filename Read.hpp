@@ -14,6 +14,7 @@ public:
 	std::string clas;
 	std::string genus;
 	std::string species;
+	std::string classifcation;
 
 	Read(std::string i,
 		int l);
@@ -21,5 +22,5 @@ public:
 
 	void setTaxonomy(std::vector<std::string>& tmp);
 	std::string getClassification(char level);
-
+	bool parentLevel(std::string level);
 };

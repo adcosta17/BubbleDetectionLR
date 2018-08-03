@@ -10,6 +10,9 @@
 
 using namespace std;
 
+bool sortSecond(const pair<string, int>& a, const pair<string, int>& b){
+	return (a.second > b.second);
+}
 
 int main(int argc, char** argv)
 {
@@ -167,22 +170,49 @@ int main(int argc, char** argv)
                     result.push_back(level);
                 }
                 read_classification[id].setTaxonomy(result);
+                string tmp = read_classification[id].getClassification(group_level);
+                if(tmp != ""){
+                	if(species_count.count(id) == 0){
+                		species_count.insert(make_pair(id, 0));
+                	}
+                	species_count[id] += 1;
+                }
             }
+            // Convert species_count to vector of pairs, sort by second pair value 
+            // Then in decreasing order of reads classified assemble 
 
-            map<string, int> species_count;
-            for(map<string, string>::iterator it=read_taxonomy.begin(); it!= read_taxonomy.end(); ++it){
-                //if (it->second.find(group_level) != std::string::npos) {
-                    // Know this read is classified to at least the level requested
-                    // Need to then narrow 
-
-                //}
-                //if(it->second[it->second.size() - 1].at(0) == 's'){
-                //    if(species_count.count(it->second) == 0){
-                //        species_count.insert(make_pair(it->second, 0));
-                //    }
-                //    species_count[it->second] += 1;
-                //}
+          	vector<pair<string,int>> sorted_species_counts;
+            for(map<string, int>::iterator it=species_count.begin(); it!= species_count.end(); ++it){
+                pair<string, int> tmp;
+                tmp.first = it->first;
+                tmp.second = it->second;
+                sorted_species_counts.push_back(tmp);
             }
+            species_count.clear();
+           	sort(sorted_species_counts.begin(), sorted_species_counts.end(), sortSecond);
+
+
+           	//Iterate over the now sorted list of groups, filter reads for each group, assemble them
+           	//Prune out any reads that are in a connected component after cleanup, and return rest to pool
+
+           	set<string> available_reads = read_ids;
+           	for(int i=0; i < sorted_species_counts.size(); i++){
+           		string level = sorted_species_counts[i].first;
+           		set<string> ids_for_group;
+           		//compute all reads that have this level or also fall into the bins above it
+           		for(map<string, Read>::iterator it=read_classification.begin(); it!= read_classification.end(); ++it){
+           			if(level == it->second.getClassification(group_level)){
+           				ids_for_group.insert(it->first);
+           			} else if(it->second.parentLevel(level)){
+           				// Here Read is subset of level or unclassifed
+           				ids_for_group.insert(it->first);
+           			}
+           		}
+           		// Compute difference between all valid ids and ids that are available
+           		set<string> ids_to_use;
+           		set_intersection(available_reads.begin(), available_reads.end(), ids_for_group.begin(), ids_for_group.end(), inserter(ids_to_use, ids_to_use.begin()));
+           		
+           	}
 
         	//return 0;
         }

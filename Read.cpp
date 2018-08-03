@@ -30,8 +30,38 @@ void Read::setTaxonomy(std::vector<std::string>& tmp){
 			case 'd': domain = val; break;
 			default: break;
 		}
-	}
+	}	
 }
+
+bool Read::parentLevel(std::string level){
+	//Check each level down to the requested comparison level, or until classification runs out
+	//Function only called if exact match on requested level not found
+
+	if(domain != "" && level.find(domain) == std::string::npos){
+		return false;
+	}
+	if(kingdom != "" && level.find(kingdom) == std::string::npos){
+		return false;
+	}
+	if(phylum != "" && level.find(phylum) == std::string::npos){
+		return false;
+	}
+	if(clas != "" && level.find(clas) == std::string::npos){
+		return false;
+	}
+	if(order != "" && level.find(order) == std::string::npos){
+		return false;
+	}
+	if(family != "" && level.find(family) == std::string::npos){
+		return false;
+	}
+	if(genus != "" && level.find(genus) == std::string::npos){
+		return false;
+	}
+	return true;
+}
+
+
 
 // Returns the read's full classification string from desired level up
 // If read doesn't have classification to that level it returns an empty string
