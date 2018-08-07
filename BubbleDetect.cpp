@@ -6,13 +6,12 @@
 #include <regex>
 #include <cstdlib>
 #include "MatchUtils.hpp"
-#include "Read.hpp"
 
-using namespace std;
-
-bool sortSecond(const pair<string, int>& a, const pair<string, int>& b){
+bool sortSecond(const std::pair<std::string, int>& a, const std::pair<std::string, int>& b){
 	return (a.second > b.second);
 }
+
+using namespace std;
 
 int main(int argc, char** argv)
 {
@@ -37,7 +36,7 @@ int main(int argc, char** argv)
             case 'f': fuzz = atoi(optarg); break;
             case 't': threshold = atoi(optarg); break;
             case 'm': mpa_file = optarg; group = true; break;
-            case 'x': group_level = atoc(optarg); break;
+            case 'x': group_level = optarg[0]; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -134,8 +133,8 @@ int main(int argc, char** argv)
             read_names[id] = read_names[id] + " : " + result[result.size() - 1];
             read_lowest_taxonomy.insert(make_pair(id, result[result.size() - 1]));
             if(col){
-                for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it){
-                    if (result[result.size() - 1].find(it->first) != std::string::npos){
+                for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it) {
+                    if (result[result.size() - 1].find(it->first) != std::string::npos) {
                         colours[id] = it->second;
                         break;
                     }
@@ -155,9 +154,9 @@ int main(int argc, char** argv)
             // For each in this order assemble
 
             // Need to read in mpa file to get 
-            ifstream inputFile_filter(mpa_file);
+            ifstream inputFile_mpa(mpa_file);
             map<string, int> species_count;
-            while (getline(inputFile_filter, line))
+            while (getline(inputFile_mpa, line))
             {   
                 istringstream lin(line);
                 string id, classification, level;
@@ -169,8 +168,11 @@ int main(int argc, char** argv)
                 {
                     result.push_back(level);
                 }
-                read_classification[id].setTaxonomy(result);
-                string tmp = read_classification[id].getClassification(group_level);
+                string tmp = "";
+                if(read_classification.count(id) != 0){
+                    read_classification.at(id).setTaxonomy(result);
+                    tmp = read_classification.at(id).getClassification(group_level);
+                }
                 if(tmp != ""){
                 	if(species_count.count(id) == 0){
                 		species_count.insert(make_pair(id, 0));
@@ -181,7 +183,7 @@ int main(int argc, char** argv)
             // Convert species_count to vector of pairs, sort by second pair value 
             // Then in decreasing order of reads classified assemble 
 
-          	vector<pair<string,int>> sorted_species_counts;
+          	vector<pair<string,int> > sorted_species_counts;
             for(map<string, int>::iterator it=species_count.begin(); it!= species_count.end(); ++it){
                 pair<string, int> tmp;
                 tmp.first = it->first;
@@ -196,23 +198,24 @@ int main(int argc, char** argv)
            	//Prune out any reads that are in a connected component after cleanup, and return rest to pool
             map<string, vector<Match> > graph_edges;
            	set<string> available_reads = read_ids;
-           	for(int i=0; i < sorted_species_counts.size(); i++){
+           	for(int i=0; i < sorted_species_counts.size(); i++)
+            {
            		string level = sorted_species_counts[i].first;
                 cerr << "Assembling: " << level << endl;
-           		set<string> ids_for_group;
-           		//compute all reads that have this level or also fall into the bins above it
-           		for(map<string, Read>::iterator it=read_classification.begin(); it!= read_classification.end(); ++it){
-           			if(level == it->second.getClassification(group_level)){
-           				ids_for_group.insert(it->first);
-           			} else if(it->second.parentLevel(level)){
-           				// Here Read is subset of level or unclassifed
-           				ids_for_group.insert(it->first);
-           			}
-           		}
-           		// Compute difference between all valid ids and ids that are available
-           		set<string> ids_to_use;
-           		set_intersection(available_reads.begin(), available_reads.end(), ids_for_group.begin(), ids_for_group.end(), inserter(ids_to_use, ids_to_use.begin()));
-           	
+                set<string> ids_for_group;
+                //compute all reads that have this level or also fall into the bins above it
+                for(map<string, Read>::iterator it=read_classification.begin(); it!= read_classification.end(); ++it){
+                    if(level == it->second.getClassification(group_level)){
+                        ids_for_group.insert(it->first);
+                    } else if(it->second.parentLevel(level)){
+                        // Here Read is subset of level or unclassifed
+                        ids_for_group.insert(it->first);
+                    }
+                }
+                // Compute difference between all valid ids and ids that are available
+                set<string> ids_to_use;
+                set_intersection(available_reads.begin(), available_reads.end(), ids_for_group.begin(), ids_for_group.end(), inserter(ids_to_use, ids_to_use.begin()));
+            
                 // Now that we have set of ids to use, prune all overlaps to get subset of valid overlaps to use for assembly
                 map<string, vector<Match> > species_matches;
                 map<string, vector<Match> > species_edge_lists;

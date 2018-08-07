@@ -19,6 +19,7 @@ public:
 	Read(std::string i,
 		int l);
 
+	//Read();
 
 	void setTaxonomy(std::vector<std::string>& tmp);
 	std::string getClassification(char level);

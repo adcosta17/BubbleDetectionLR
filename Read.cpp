@@ -1,5 +1,22 @@
 #include "Read.hpp"
 
+
+/*
+Read::Read(){
+		id = "";
+		length = 0;
+		domain = "";
+		kingdom = "";
+		phylum = "";
+		order = "";
+		family = "";
+		clas = "";
+		genus = "";
+		species = "";
+}
+
+*/
+
 Read::Read(std::string i,
 		int l)
 	: id(i), length(l){
@@ -18,7 +35,7 @@ void Read::setTaxonomy(std::vector<std::string>& tmp){
 	for (int i = 0; i < tmp.size(); ++i)
 	{
 		char tax = tmp[i].at(0);
-		string val = tmp[i].substr(3);
+		std::string val = tmp[i].substr(3);
 		switch(tax){
 			case 's': species = val; break;
 			case 'g': genus = val; break;
