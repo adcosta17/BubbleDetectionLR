@@ -678,7 +678,7 @@ void MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& al
             }
         }
     }
-    std::cerr << "Removed Edges " << count << std::endl;
+    std::cerr << "\tRemoved Edges " << count << std::endl;
 }
 
 
@@ -750,6 +750,99 @@ int MatchUtils::mark_matches_for_node(std::map<std::string, std::vector<Match> >
 		}
 	}
 	return count;
+}
+
+
+bool check_contigs_for_match(std::string& id, std::string& id2, std::map<int, std::vector<Match> >& contig_map){
+    for (std::map<int,std::vector<Match> >::iterator it = contig_map.begin(); it != contig_map.end(); ++it)
+    {
+        for(int i = 0; i < it->second.size(); i++){
+            if(id == it->second[i].target_read_id && id2 == it->second[i].query_read_id){
+                return true;
+            }
+            if(id2 == it->second[i].target_read_id && id == it->second[i].query_read_id){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void get_matches_for_contig(std::string& id, std::string& id2, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<Match>& tmp){
+    // Always going from id to id2
+    // First check that we haven't already visted this edge before for the same contig (Circular contigs specifically)
+    for(int i = 0; i < tmp.size(); i++){
+        if ((id == tmp[i].target_read_id && id2 == tmp[i].query_read_id) || (id2 == tmp[i].target_read_id && id == tmp[i].query_read_id)){
+            return;
+        }
+    }
+    // Second locate the edge from id to id2, and add it to the vector
+    // Sorted by lexographically smaller value
+    if(id < id2){
+        for(int i = 0; i < all_matches[id].size(); i++){
+            if ((id == all_matches[id][i].target_read_id && id2 == all_matches[id][i].query_read_id) || (id2 == all_matches[id][i].target_read_id && id == all_matches[id][i].query_read_id)){
+                tmp.push_back(all_matches[id][i]);
+            }
+        }
+    } else {
+        for(int i = 0; i < all_matches[id2].size(); i++){
+            if ((id == all_matches[id2][i].target_read_id && id2 == all_matches[id2][i].query_read_id) || (id2 == all_matches[id2][i].target_read_id && id == all_matches[id2][i].query_read_id)){
+                tmp.push_back(all_matches[id2][i]);
+            }
+        }
+    }
+    // Next see if id2 is a branch (Either indegree or outdegree must be 2)
+    if(read_indegree[id2] >= 2 || read_outdegree[id2] >= 2){
+        return;
+    }
+    // Check to see if this is a dead end, if id2 is at a dead end then we can end the contig
+    // Know that id must be on the otherside to get us here
+    if(read_indegree[id2] == 0 || read_outdegree[id2] == 0){
+        return;
+    }
+    // If not we need to see if we got to id2 from indegree or outdegree, and then continue to the other
+    // Know that there must be either 1  in either.
+    if(read_indegree[id2][0] == id){
+        get_matches_for_contig(id2, read_outdegree[id2][0], all_matches, read_indegree, read_outdegree, tmp)
+    } else {
+        get_matches_for_contig(id2, read_indegree[id2][0], all_matches, read_indegree, read_outdegree, tmp)
+    }
+}
+
+void MatchUtils::compute_contigs(std::string& id, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::map<int, std::vector<Match> >& contig_map, int& contig_number){
+    // Look at indegree and outdegree of id
+    // If it is a branch or a dead end, iterate until we get to a branch
+    if(read_indegree[id] >= 2){
+        // Iterate over each branch
+        for(int i = 0; i < read_indegree[id].size(); i++){
+            // Check if branch has already been taken from other direction
+            if(!check_contigs_for_match(id, read_indegree[id][i], contig_map)){
+                // Get vector of overlaps and save as a contig
+                std::vector<Match> tmp;
+                get_matches_for_contig(id, read_indegree[id][i], all_matches, read_indegree, read_outdegree, tmp);
+                contig_map.insert(make_pair(contig_number, tmp));
+                contig_number++;
+            }
+        }
+    }
+    if(read_outdegree[id] >= 2){
+        for(int i = 0; i < read_outdegree[id].size(); i++){
+            // Check if branch has already been taken from other direction
+            if(!check_contigs_for_match(id, read_outdegree[id][i], contig_map)){
+                // Get vector of overlaps and save as a contig
+                std::vector<Match> tmp;
+                get_matches_for_contig(id, read_outdegree[id][i], all_matches, read_indegree, read_outdegree, tmp);
+                contig_map.insert(make_pair(contig_number, tmp));
+                contig_number++;
+            }
+        }
+    }
+    if(read_indegree[id] == 0 && read_outdegree[id] >=1){
+
+    }
+    if(read_outdegree[id] == 0 && read_indegree[id] >=1){
+        
+    }
 }
 
 
@@ -956,7 +1049,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
 		    }
         }
     }
-    std::cerr << "Reduced " << count << " edges" << std::endl;
+    std::cerr << "\tReduced " << count << " edges" << std::endl;
 }
 
 void MatchUtils::toGfa(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, std::vector<std::string> >& read_indegree, std::map<std::string, std::vector<std::string> >& read_outdegree, std::map<std::string, std::string>& read_names, std::map<std::string, std::string>& colours)
