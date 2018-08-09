@@ -403,15 +403,45 @@ int main(int argc, char** argv)
 
     map<int, vector<Match> > contigs_sets;
     int contig_num = 0;
-    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
         // Look for nodes that have at least 2 valid neighbours, or are dead ends
         // For each one we need to iterate over each neighbour and find path to next branch node
         if(read_indegree[*it].size() >= 2 || read_outdegree[*it].size() >= 2 || (read_indegree[*it].size() == 0 && read_outdegree[*it].size() >= 1) || (read_outdegree[*it].size() == 0 && read_indegree[*it].size() >= 1)) {
-            MatchUtils::compute_contigs(*it, all_matches, read_indegree, read_outdegree, contigs_sets, contig_num);
+            contig_num = MatchUtils::compute_contigs(*it, all_matches, read_indegree, read_outdegree, contigs_sets, contig_num);
+        }
+    }
+    vector<int> contig_lengths;
+    int total_length = 0;
+    // Now compute the length of each contig
+    for (map<int, vector<Match> >::iterator it = contigs_sets.begin(); it != contigs_sets.end(); ++it)
+    {
+        int len = 0;
+        for (int i = 0; i < it->second.size(); ++i)
+        {
+            if(i == 0){
+                len += it->second[i].query_read_length;
+            }
+            len += it->second[i].length;
+        }
+        contig_lengths.push_back(len);
+        total_length += len;
+    }
+
+    // Compute N50 and report number of contigs and total length
+    sort(contig_lengths.begin(), contig_lengths.end(), greater<int>());
+    int n50 = 0;
+    int sum_len = 0;
+    for (int i = 0; i < contig_lengths.size(); ++i)
+    {
+        sum_len += contig_lengths[i];
+        if(sum_len/float(total_length) > 0.5){
+            n50 = contig_lengths[i];
+            break;
         }
     }
 
+    cout << "N50: " << n50 << " , Length (bp): " << total_length << " , with " << contig_num << " contigs" << endl;
     
   	return 0;
 }
