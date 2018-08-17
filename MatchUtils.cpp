@@ -79,6 +79,15 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
         //}
         //cerr << cg << endl;
         // Check for self alignments && contained reads
+        Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,cg);
+        if(raw_matches.count(c1) == 0){
+            vector<Match> tmp;
+            raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
+        }
+        if(raw_matches.count(c6) == 0){
+            vector<Match> tmp;
+            raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
+        }
         if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
             if(c1 == c6){
                 count++;
@@ -93,22 +102,21 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
         }
         // Check that the alignments are proper, and at the ends of reads, if not edge reduction will fail    	
         // Generate Unflitered Matches for the raw gfa file
-        Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,cg);
         if(!tmpLine.internal_edge() && tmpLine.check_match_contained() == 0){
-        	if(raw_matches.count(c1) == 0){
+        	if(all_matches.count(c1) == 0){
         		vector<Match> tmp;
-        		raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
+        		all_matches.insert(pair<string, vector<Match> >(c1,tmp));
         	}
-        	if(raw_matches.count(c6) == 0){
+        	if(all_matches.count(c6) == 0){
         		vector<Match> tmp;
-        		raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
+        		all_matches.insert(pair<string, vector<Match> >(c6,tmp));
         	}
 	        // Determine which list to store under based on lexographic comparison
 	        // Should never have equality here, check done above already 
 	        if(c1 < c6) {
-	        	raw_matches[c1].push_back(tmpLine);
+	        	all_matches[c1].push_back(tmpLine);
 	        } else {
-	        	raw_matches[c6].push_back(tmpLine);
+	        	all_matches[c6].push_back(tmpLine);
 	        }
 	        if(edge_lists.count(c1) == 0){
 	        	vector<Match> tmp;
@@ -150,7 +158,6 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 
     }
     cerr << count << " Self Matches and/or Internal Matches removed" << endl;
-	all_matches = raw_matches;
     // Drop any reads found to be contained, Drop all entries to them from all_matches
     for (map<string, vector<Match> >::iterator it2=all_matches.begin(); it2!=all_matches.end(); ++it2)
     {
@@ -178,6 +185,77 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
         }
     }
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
+}
+
+std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids){
+    // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
+    // Don't want to fully visualize as we need to see where each read comes from
+    // Concensus step of OLC format
+    // Look for nodes that are branches. Iterate along each branch and add overlaps to list of edges against respective contig
+    // Keep going until we get to a node that is a branch, in either direction.
+
+    using namespace std;
+
+    map<int, vector<Match> > contigs_sets;
+    int contig_num = 0;
+    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        // Look for nodes that have at least 2 valid neighbours, or are dead ends
+        // For each one we need to iterate over each neighbour and find path to next branch node
+        if(read_indegree[*it].size() >= 2 || read_outdegree[*it].size() >= 2 || (read_indegree[*it].size() == 0 && read_outdegree[*it].size() >= 1) || (read_outdegree[*it].size() == 0 && read_indegree[*it].size() >= 1)) {
+            contig_num = MatchUtils::compute_contigs(*it, all_matches, read_indegree, read_outdegree, contigs_sets, contig_num);
+        }
+    }
+    if(contig_num == 0){
+        // No contigs found
+        return "";
+    }
+    vector<int> contig_lengths;
+    int total_length = 0;
+    // Now compute the length of each contig
+    for (map<int, vector<Match> >::iterator it = contigs_sets.begin(); it != contigs_sets.end(); ++it)
+    {
+        if(it->second.size() == 1){
+            if(it->second[0].length_to_use == 0){
+                continue;
+            }
+        }
+        int len = 0;
+        for (int i = 0; i < it->second.size(); ++i)
+        {
+            if(i == 0){
+                // Know that we must have at least two edges, otherwise they wouldn't be included here
+                if(it->second[i].length_to_use > 0){
+                    len = it->second[i].length_to_use;
+                    break;
+                }
+                else if(it->second[i].query_read_id == it->second[i+1].query_read_id || it->second[i].query_read_id == it->second[i+1].target_read_id){
+                    len = it->second[i].target_read_length;
+                } else {
+                    len = it->second[i].query_read_length;
+                }
+            }
+            len += it->second[i].length;
+        }
+        contig_lengths.push_back(len);
+        total_length += len;
+    }
+
+    // Compute N50 and report number of contigs and total length
+    sort(contig_lengths.begin(), contig_lengths.end(), greater<int>());
+    int n50 = 0;
+    int sum_len = 0;
+    for (int i = 0; i < contig_lengths.size(); ++i)
+    {
+        sum_len += contig_lengths[i];
+        //cout << sum_len << " " << contig_lengths[i] << " " << total_length << " " << sum_len/float(total_length) << endl;
+        if(sum_len/float(total_length) > 0.5){
+            n50 = contig_lengths[i];
+            break;
+        }
+    }
+
+    return string("N50: ") + to_string(n50) + " , Total Length: " + to_string(total_length) + "bp , with " + to_string(contig_lengths.size()) + " contigs. Max Contig: " + to_string(contig_lengths[0]) + "bp";
 }
 
 
@@ -814,6 +892,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
     // If it is a branch or a dead end, iterate until we get to a branch
     if((read_indegree[id].size() >= 2) || (read_outdegree[id].size() == 0 && read_indegree[id].size() >=1)){
         // Iterate over each branch
+        int count_already_matched = 0;
         for(int i = 0; i < read_indegree[id].size(); i++){
             // Check if branch has already been taken from other direction
             if(!check_contigs_for_match(id, read_indegree[id][i], contig_map)){
@@ -822,10 +901,60 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
                 get_matches_for_contig(id, read_indegree[id][i], all_matches, read_indegree, read_outdegree, tmp);
                 contig_map.insert(make_pair(contig_number, tmp));
                 contig_number++;
+            } else {
+                count_already_matched++;
             }
+        }
+        // Have the case where the outdegree can be > 0.
+        if(read_outdegree[id].size() >= 0){
+            for(int i = 0; i < read_outdegree[id].size(); i++){
+                // Check if branch has already been taken from other direction
+                if(!check_contigs_for_match(id, read_outdegree[id][i], contig_map)){
+                    // Get vector of overlaps and save as a contig
+                    std::vector<Match> tmp;
+                    get_matches_for_contig(id, read_outdegree[id][i], all_matches, read_indegree, read_outdegree, tmp);
+                    contig_map.insert(make_pair(contig_number, tmp));
+                    contig_number++;
+                }
+            }
+        }
+        // Here we have the case where a read is a branch and dead end. ie the end of a bubble. But it needs to be its own contig
+        if((read_outdegree[id].size() == 0 && read_indegree[id].size() >=2) && count_already_matched == read_indegree[id].size()){
+            std::string id2 = read_indegree[id][0];
+            std::vector<Match> tmp;
+            if(id < id2){
+                for(int i = 0; i < all_matches[id].size(); i++){
+                    if ((id == all_matches[id][i].target_read_id && id2 == all_matches[id][i].query_read_id) || (id2 == all_matches[id][i].target_read_id && id == all_matches[id][i].query_read_id)){
+                        Match tmp_match = all_matches[id][i];
+                        // Want to make sure we use the correct length
+                        if(id == tmp_match.target_read_id){
+                            tmp_match.length_to_use = tmp_match.target_read_length;
+                        } else {
+                            tmp_match.length_to_use = tmp_match.query_read_length;
+                        }
+                        tmp.push_back(tmp_match);
+                    }
+                }
+            } else {
+                for(int i = 0; i < all_matches[id2].size(); i++){
+                    if ((id == all_matches[id2][i].target_read_id && id2 == all_matches[id2][i].query_read_id) || (id2 == all_matches[id2][i].target_read_id && id == all_matches[id2][i].query_read_id)){
+                        Match tmp_match = all_matches[id2][i];
+                        // Want to make sure we use the correct length
+                        if(id == tmp_match.target_read_id){
+                            tmp_match.length_to_use = tmp_match.target_read_length;
+                        } else {
+                            tmp_match.length_to_use = tmp_match.query_read_length;
+                        }
+                        tmp.push_back(tmp_match);
+                    }
+                }
+            }
+            contig_map.insert(make_pair(contig_number, tmp));
+            contig_number++;
         }
     }
     if((read_outdegree[id].size() >= 2) || (read_indegree[id].size() == 0 && read_outdegree[id].size() >=1)){
+        int count_already_matched = 0;
         for(int i = 0; i < read_outdegree[id].size(); i++){
             // Check if branch has already been taken from other direction
             if(!check_contigs_for_match(id, read_outdegree[id][i], contig_map)){
@@ -834,7 +963,55 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
                 get_matches_for_contig(id, read_outdegree[id][i], all_matches, read_indegree, read_outdegree, tmp);
                 contig_map.insert(make_pair(contig_number, tmp));
                 contig_number++;
+            } else {
+                count_already_matched++;
             }
+        }
+        // Have the case where the outdegree can be > 0.
+        if(read_indegree[id].size() >= 0){
+            for(int i = 0; i < read_indegree[id].size(); i++){
+                // Check if branch has already been taken from other direction
+                if(!check_contigs_for_match(id, read_indegree[id][i], contig_map)){
+                    // Get vector of overlaps and save as a contig
+                    std::vector<Match> tmp;
+                    get_matches_for_contig(id, read_indegree[id][i], all_matches, read_indegree, read_outdegree, tmp);
+                    contig_map.insert(make_pair(contig_number, tmp));
+                    contig_number++;
+                }
+            }
+        }
+        if((read_indegree[id].size() == 0 && read_outdegree[id].size() >=2) && count_already_matched == read_outdegree[id].size()){
+            std::string id2 = read_outdegree[id][0];
+            std::vector<Match> tmp;
+            if(id < id2){
+                for(int i = 0; i < all_matches[id].size(); i++){
+                    if ((id == all_matches[id][i].target_read_id && id2 == all_matches[id][i].query_read_id) || (id2 == all_matches[id][i].target_read_id && id == all_matches[id][i].query_read_id)){
+                        Match tmp_match = all_matches[id][i];
+                        // Want to make sure we use the correct length
+                        if(id == tmp_match.target_read_id){
+                            tmp_match.length_to_use = tmp_match.target_read_length;
+                        } else {
+                            tmp_match.length_to_use = tmp_match.query_read_length;
+                        }
+                        tmp.push_back(tmp_match);
+                    }
+                }
+            } else {
+                for(int i = 0; i < all_matches[id2].size(); i++){
+                    if ((id == all_matches[id2][i].target_read_id && id2 == all_matches[id2][i].query_read_id) || (id2 == all_matches[id2][i].target_read_id && id == all_matches[id2][i].query_read_id)){
+                        Match tmp_match = all_matches[id2][i];
+                        // Want to make sure we use the correct length
+                        if(id == tmp_match.target_read_id){
+                            tmp_match.length_to_use = tmp_match.target_read_length;
+                        } else {
+                            tmp_match.length_to_use = tmp_match.query_read_length;
+                        }
+                        tmp.push_back(tmp_match);
+                    }
+                }
+            }
+            contig_map.insert(make_pair(contig_number, tmp));
+            contig_number++;
         }
     }
     return contig_number;

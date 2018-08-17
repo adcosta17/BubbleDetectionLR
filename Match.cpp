@@ -12,7 +12,7 @@ Match::Match(std::string qrid, int qrl, int qrs, int qre,
 	target_read_start(trs), target_read_end(tre),
 	residue_matches(rm), alignment_block(ab), 
 	reversed(rev), prefix_length(pl), suffix_length(sl),
-	cigar(cg), reduce(false) {
+	cigar(cg), reduce(false), length_to_use(0) {
 
 		if(strand == '+'){
 			if(query_read_start > target_read_start){

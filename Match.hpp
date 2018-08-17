@@ -26,6 +26,7 @@ public:
 	char fixed_strand;
 	int length;
 	int orientation;
+	int length_to_use;
 
 	Match(std::string qrid,
 		int qrl,

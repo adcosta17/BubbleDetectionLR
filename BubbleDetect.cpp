@@ -20,23 +20,25 @@ int main(int argc, char** argv)
     bool col = false;
     bool chimeric = false;
     bool group = false;
+    bool coverage = false;
     int opt, iterations, fuzz, threshold;
     char group_level = 's';
-    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:g:i:f:t:r:s:c:x:m:")) != EOF)
+    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, mpa_file, coverage_file;
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:x:m:")) != EOF)
     {
         switch(opt)
         {
             case 'p': pafFile = optarg; break;
-            case 'g': outputFileName = optarg; break;
+            case 'o': outputFileName = optarg; break;
             case 'r': taxonomy_file = optarg; tax = true; break;
             case 's': colour_file = optarg; col = true; break;
-            case 'c': chimeric_read_file = optarg; chimeric = true; break;
+            case 'h': chimeric_read_file = optarg; chimeric = true; break;
             case 'i': iterations = atoi(optarg); break;
             case 'f': fuzz = atoi(optarg); break;
             case 't': threshold = atoi(optarg); break;
             case 'm': mpa_file = optarg; group = true; break;
             case 'x': group_level = optarg[0]; break;
+            case 'c': coverage_file = optarg; coverage = true; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -52,7 +54,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -g Gfa_Output_File.gfa\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read_classification_file\n (optional) -s species_to_colour_map\n (optional) -c chimeric_read_map\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -o Output Path and Prefix\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map";
         return 0;
     }
 
@@ -64,6 +66,7 @@ int main(int argc, char** argv)
     map<string, int> read_lengths;
     set<string> chimeric_reads;
     map<string, Read> read_classification;
+    map<string, float> read_coverage;
 
     if(chimeric){
         ifstream inputFileChimeric(chimeric_read_file);
@@ -79,9 +82,21 @@ int main(int argc, char** argv)
         }
     }
 
+    if(coverage){
+        ifstream inputFileCoverage(coverage_file);
+        string line;
+        while (getline(inputFileCoverage, line))
+        {
+            istringstream lin(line);
+            string id;
+            float cov;
+            lin >> id >> cov;
+            read_coverage.insert(make_pair(id, cov));
+        }
+    }
+
     cerr << "Parsing Paf Input File" << endl;
     int mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, true);
-    raw_matches.clear();
     cerr << read_ids.size() << " Unique Reads found in File"<< endl;
     cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
     map<string, vector<string> > read_indegree; // Number of times read is target
@@ -198,6 +213,7 @@ int main(int argc, char** argv)
            	//Prune out any reads that are in a connected component after cleanup, and return rest to pool
             map<string, vector<Match> > graph_edges;
            	set<string> available_reads = read_ids;
+            vector<string> n50_values;
            	for(int i=0; i < sorted_species_counts.size(); i++)
             {
            		string level = sorted_species_counts[i].first;
@@ -245,7 +261,10 @@ int main(int argc, char** argv)
                 read_indegree.clear();
                 read_outdegree.clear();
                 MatchUtils::compute_in_out_degree(species_matches, ids_to_use, read_indegree, read_outdegree);
-
+                string n50_val = MatchUtils::compute_n50(species_matches, read_indegree, read_outdegree, ids_to_use);
+                if(n50_val != ""){
+                    n50_values.push_back(level + "\n" + n50_val);
+                }
                 // Need to compute set of reads that was actually used and then remove them from the valid read set
                 set<string> reads_in_graph;
                 for (set<string>::iterator it=ids_to_use.begin(); it!=ids_to_use.end(); ++it){
@@ -277,7 +296,7 @@ int main(int argc, char** argv)
             read_indegree.clear();
             read_outdegree.clear();
             MatchUtils::compute_in_out_degree(graph_edges, read_ids, read_indegree, read_outdegree);
-            MatchUtils::toGfa(graph_edges,read_lengths, outputFileName, read_indegree, read_outdegree, read_names, colours);
+            MatchUtils::toGfa(graph_edges,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
 
             // Now call bubbles
 
@@ -320,17 +339,24 @@ int main(int argc, char** argv)
                     }
                 }
             }
+            std::ofstream n50Output;
+            n50Output.open(outputFileName+"_assembly_stats.txt");
+            for (int k = 0; k < n50_values.size(); k++)
+            {
+                n50Output << n50_values[k] << "\n"; 
+            }
+            n50Output << "Overall: " << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+            n50Output.close();
+            return 0;
         }
     }
 
-    if(!group){
+    if(!group) {
 
         // Myers Transitive Reduction Alg
         cerr << "Reducing Edges" << endl;
         MatchUtils::reduce_edges(all_matches, read_ids, edge_lists, fuzz);
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-        string tmp_name = outputFileName + "reduced";
-        MatchUtils::toGfa(all_matches,read_lengths, tmp_name, read_indegree, read_outdegree, read_names, colours);
         
         //Clean up all_matches and then the edge_lists
         cerr << "Dropping Reduced Edges" << endl;
@@ -351,8 +377,7 @@ int main(int argc, char** argv)
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-        tmp_name = outputFileName + "pruned";
-        MatchUtils::toGfa(all_matches,read_lengths, tmp_name, read_indegree, read_outdegree, read_names, colours);
+        MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
 
         cerr << "Compute Possible Bubbles" << endl;
         //Find Paths to each node from a given start
@@ -377,7 +402,7 @@ int main(int argc, char** argv)
         // Check to find sets that are unique less the two ends of the pair
         // A true bubble will have reads that only appear in the bubble
         // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
-        std::set<std::pair<std::string, std::string> > seen_bubbles;
+        set<pair<string, string> > seen_bubbles;
         for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
         {    
             if(MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree)){
@@ -393,56 +418,12 @@ int main(int argc, char** argv)
                 }
             }
         }
+        std::ofstream n50Output;
+        n50Output.open(outputFileName+"_assembly_stats.txt");
+        n50Output << "Overall: " << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+        n50Output.close();
     }
-
-    // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
-    // Don't want to fully visualize as we need to see where each read comes from
-    // Concensus step of OLC format
-    // Look for nodes that are branches. Iterate along each branch and add overlaps to list of edges against respective contig
-    // Keep going until we get to a node that is a branch, in either direction.
-
-    map<int, vector<Match> > contigs_sets;
-    int contig_num = 0;
-    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
-    {
-        // Look for nodes that have at least 2 valid neighbours, or are dead ends
-        // For each one we need to iterate over each neighbour and find path to next branch node
-        if(read_indegree[*it].size() >= 2 || read_outdegree[*it].size() >= 2 || (read_indegree[*it].size() == 0 && read_outdegree[*it].size() >= 1) || (read_outdegree[*it].size() == 0 && read_indegree[*it].size() >= 1)) {
-            contig_num = MatchUtils::compute_contigs(*it, all_matches, read_indegree, read_outdegree, contigs_sets, contig_num);
-        }
-    }
-    vector<int> contig_lengths;
-    int total_length = 0;
-    // Now compute the length of each contig
-    for (map<int, vector<Match> >::iterator it = contigs_sets.begin(); it != contigs_sets.end(); ++it)
-    {
-        int len = 0;
-        for (int i = 0; i < it->second.size(); ++i)
-        {
-            if(i == 0){
-                len += it->second[i].query_read_length;
-            }
-            len += it->second[i].length;
-        }
-        contig_lengths.push_back(len);
-        total_length += len;
-    }
-
-    // Compute N50 and report number of contigs and total length
-    sort(contig_lengths.begin(), contig_lengths.end(), greater<int>());
-    int n50 = 0;
-    int sum_len = 0;
-    for (int i = 0; i < contig_lengths.size(); ++i)
-    {
-        sum_len += contig_lengths[i];
-        if(sum_len/float(total_length) > 0.5){
-            n50 = contig_lengths[i];
-            break;
-        }
-    }
-
-    cout << "N50: " << n50 << " , Length (bp): " << total_length << " , with " << contig_num << " contigs" << endl;
-    
+           
   	return 0;
 }
 
