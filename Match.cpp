@@ -106,8 +106,8 @@ int Match::check_match_contained()
 		tl5 = target_read_start;
 		tl3 = target_read_length - target_read_end;
 	}
-	ext5 = query_read_start < tl5? query_read_start : tl5;
-	ext3 = query_read_length - query_read_end < tl3? query_read_length - query_read_end : tl3;
+	ext5 = query_read_start < tl5 ? query_read_start : tl5;
+	ext3 = query_read_length - query_read_end < tl3 ? query_read_length - query_read_end : tl3;
 	if (ext5 > max_hang || ext3 > max_hang || query_read_end - query_read_start < (query_read_end - query_read_start + ext5 + ext3) * 0.8){
 		return 0;
 	}

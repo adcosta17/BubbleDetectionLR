@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     int opt, iterations, fuzz, threshold;
     char group_level = 's';
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, mpa_file, coverage_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:x:m:")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:x:m:h:")) != EOF)
     {
         switch(opt)
         {
@@ -54,7 +54,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -o Output Path and Prefix\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -o Output Path and Prefix\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n";
         return 0;
     }
 
@@ -110,7 +110,10 @@ int main(int argc, char** argv)
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
+    map<string, string> read_full_taxonomy;
     map<string, string> read_lowest_taxonomy;
+    map<string, int> classification_count;
+    map<string, float> classification_avg_coverage;
     if(tax){
         cerr << "Taxonomy File Detected" << endl;
         map<string, string> species_map;
@@ -146,7 +149,12 @@ int main(int argc, char** argv)
                 result.push_back(level);
             }
             read_names[id] = read_names[id] + " : " + result[result.size() - 1];
+            read_full_taxonomy.insert(make_pair(id, classification));
             read_lowest_taxonomy.insert(make_pair(id, result[result.size() - 1]));
+            if(classification_count.count(classification) == 0){
+                classification_count.insert(make_pair(classification,0));
+            }
+            classification_count[classification] += 1;
             if(col){
                 for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it) {
                     if (result[result.size() - 1].find(it->first) != std::string::npos) {
@@ -156,6 +164,18 @@ int main(int argc, char** argv)
                 }
             }
         }
+        if(coverage){
+            for (map<string, string>::iterator it = read_full_taxonomy.begin(); it != read_full_taxonomy.end(); ++it)
+            {
+                string c = it->second;
+                int n = classification_count[c];
+                if(classification_avg_coverage.count(c) == 0){
+                    classification_avg_coverage.insert(make_pair(c, 0.0));
+                }
+                classification_avg_coverage[c] += (read_coverage[it->first]/n);
+            }
+        }
+
 
         if(group){
 
@@ -236,7 +256,7 @@ int main(int argc, char** argv)
                 map<string, vector<Match> > species_matches;
                 map<string, vector<Match> > species_edge_lists;
                 MatchUtils::subset_matches(all_matches, edge_lists, species_matches, species_edge_lists, ids_to_use);
-
+                cerr << "Using " << ids_to_use.size() << " reads" << endl;
                 // Myers Transitive Reduction Alg
                 cerr << "\tReducing Edges" << endl;
                 MatchUtils::reduce_edges(species_matches, ids_to_use, species_edge_lists, fuzz);
@@ -298,47 +318,6 @@ int main(int argc, char** argv)
             MatchUtils::compute_in_out_degree(graph_edges, read_ids, read_indegree, read_outdegree);
             MatchUtils::toGfa(graph_edges,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
 
-            // Now call bubbles
-
-            cerr << "\tCompute Possible Bubbles" << endl;
-            //Find Paths to each node from a given start
-            map<string, string>  bubble_pairs;
-            map<pair<string,string>, set<string> > bubble_sets;
-            for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
-            {
-                //Look for nodes that have at least 2 valid neighbours
-                if(read_indegree[*it].size() >= 2){
-                    // If we have 2 or more valid edges then check if they form a bubble
-                    // Do a breath first search on the edges out of this node.
-                    // If we get to a node we have already seen then we have a bubble, and can compute the paths between the start and this node
-                    //cout << "Checking Branch " << *it << " For Bubble" << endl;
-                    MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
-                } else if(read_outdegree[*it].size() >= 2){
-                    //cout << "Checking Branch " << *it << " For Bubble" << endl;
-                    MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
-                }
-            }
-            // For each candidate bubble check if there is really a bubble between the two
-            cerr << "\tValidate Possible Bubbles" << endl;
-            // Check to find sets that are unique less the two ends of the pair
-            // A true bubble will have reads that only appear in the bubble
-            // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
-            std::set<std::pair<std::string, std::string> > seen_bubbles;
-            for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
-            {    
-                if(MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree)){
-                    // Have Valid Bubble
-                    if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-                        cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
-                        for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
-                        {   
-                            cout << read_names[*it2] << " ";
-                        }
-                        cout << endl;
-                        seen_bubbles.insert(it->first);
-                    }
-                }
-            }
             std::ofstream n50Output;
             n50Output.open(outputFileName+"_assembly_stats.txt");
             for (int k = 0; k < n50_values.size(); k++)
@@ -379,34 +358,97 @@ int main(int argc, char** argv)
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
         MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
 
-        cerr << "Compute Possible Bubbles" << endl;
-        //Find Paths to each node from a given start
-        map<string, string>  bubble_pairs;
-        map<pair<string,string>, set<string> > bubble_sets;
-        for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
-        {
-            //Look for nodes that have at least 2 valid neighbours
-            if(read_indegree[*it].size() >= 2){
-                // If we have 2 or more valid edges then check if they form a bubble
-                // Do a breath first search on the edges out of this node.
-                // If we get to a node we have already seen then we have a bubble, and can compute the paths between the start and this node
-                //cout << "Checking Branch " << *it << " For Bubble" << endl;
-                MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
-            } else if(read_outdegree[*it].size() >= 2){
-                //cout << "Checking Branch " << *it << " For Bubble" << endl;
-                MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
-            }
+        std::ofstream n50Output;
+        n50Output.open(outputFileName+"_assembly_stats.txt");
+        n50Output << "Overall: " << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+        n50Output.close();
+    }
+
+    cerr << "Compute Possible Bubbles" << endl;
+    //Find Paths to each node from a given start
+    map<string, string>  bubble_pairs;
+    map<pair<string,string>, set<string> > bubble_sets;
+    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        //Look for nodes that have at least 2 valid neighbours
+        if(read_indegree[*it].size() >= 2){
+            // If we have 2 or more valid edges then check if they form a bubble
+            // Do a breath first search on the edges out of this node.
+            // If we get to a node we have already seen then we have a bubble, and can compute the paths between the start and this node
+            //cout << "Checking Branch " << *it << " For Bubble" << endl;
+            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
+        } else if(read_outdegree[*it].size() >= 2){
+            //cout << "Checking Branch " << *it << " For Bubble" << endl;
+            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
         }
-        // For each candidate bubble check if there is really a bubble between the two
-        cerr << "Validate Possible Bubbles" << endl;
-        // Check to find sets that are unique less the two ends of the pair
-        // A true bubble will have reads that only appear in the bubble
-        // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
-        set<pair<string, string> > seen_bubbles;
-        for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
-        {    
-            if(MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree)){
-                // Have Valid Bubble
+    }
+    // For each candidate bubble check if there is really a bubble between the two
+    cerr << "Validate Possible Bubbles" << endl;
+    // Check to find sets that are unique less the two ends of the pair
+    // A true bubble will have reads that only appear in the bubble
+    // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
+    set<pair<string, string> > seen_bubbles;
+    for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+    {    
+    	// Four ways of validating.
+    	// If we have taxinomic info and coverage, coverage only, taxonomy only and neither of the two
+        vector<vector<string> > arms;
+        if(tax || coverage){
+            MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
+        }
+    	if(tax && coverage){
+    		// Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
+    		// And then see if it matches what coverage the arms have
+    		bool valid = true;
+    		// We now have each arm of the bubble. Now can compute the coverage for each arm, as the average of the coverage for each read in the arm
+    		if(arms.size() < 2){
+    			continue;
+    		}
+    		vector<float> avg_cov;
+    		for (int i = 0; i < arms.size(); ++i)
+    		{
+    			float tmp = 0.0;
+    			for (int j = 0; j < arms[i].size(); ++j)
+    			{
+    				tmp += read_coverage[arms[i][j]];
+    			}
+    			avg_cov.push_back(tmp/arms[i].size());
+    		}
+    		// Now need to compute the average coverage for each species/supspecies found in the arm
+    		// First get the species/subspecies in each arm using read_full_taxonomy
+    		// Want to also get the length of each arm as a contig at this spot at well
+            vector<float> arm_tax_cov;
+    		for (int i = 0; i < arms.size(); ++i)
+    		{
+                float tmp = 0.0;
+    			for (int j = 0; j < arms[i].size(); ++j)
+    			{
+    				if(j == 0 || j == arms[i].size()){
+    					//ignore the first read, this is the start, and ignore the last one, the end. These are shared so they shouldn't be used to distinguish arms
+                        continue;
+    				}
+                    // Otherwise get the edge lengths of each overlap, and then weight each read's coverage. Each read should have a classification. 
+                    // If it doesn't then use the read coverage
+                    tmp += classification_avg_coverage[read_full_taxonomy[arms[i][j]]];
+    			}
+                arm_tax_cov.push_back(tmp/arms[i].size());
+    		}
+            // Now that we have the coverage for each arm, and the average coverage based on the taxonomic classifications of the reads in the arm, we can compare and see if they match what we should be seeing
+            // Assumption is that each arm should have similar coverage as the species it comes from. If it does we call it a bubble
+            for (int i = 0; i < avg_cov.size(); ++i)
+            {
+                // Compare the average coverages between the arm itself and the species
+                float ratio;
+                if(avg_cov[i] > arm_tax_cov[i]){
+                    ratio = arm_tax_cov[i]/avg_cov[i];
+                } else {
+                    ratio = avg_cov[i]/arm_tax_cov[i];
+                }
+                if(ratio < 0.75){
+                    valid = false;
+                }
+            }
+            if(valid){
                 if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
                     cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
                     for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
@@ -417,11 +459,116 @@ int main(int argc, char** argv)
                     seen_bubbles.insert(it->first);
                 }
             }
-        }
-        std::ofstream n50Output;
-        n50Output.open(outputFileName+"_assembly_stats.txt");
-        n50Output << "Overall: " << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
-        n50Output.close();
+    	} else if(tax) {
+    		// Can use the taxonomy information to see if the arms have distinct species or subspecies
+            // Don't want to have shared lowest level of taxinomic classification between arms
+            // I.E. if each arm has a subspecies classification and share reads that have the same species classification, ok
+            // But if they share a subspecies classification, then need to see what percentage of each arm is what subspecies
+            // Base it being a bubble on if it has a majority of one subspecies in each arm (> 75%)
+
+            bool valid = false;
+            if(arms.size() < 2){
+                continue;
+            }
+            vector<set<string> > arm_classifcation;
+            for (int i = 0; i < arms.size(); ++i)
+            {
+                set<string> tmp;
+                for (int j = 0; j < arms[i].size(); ++j)
+                {
+                    tmp.insert(read_lowest_taxonomy[arms[i][j]]);
+                }
+                arm_classifcation.push_back(tmp);
+            }
+            // Now compare the species in each arm to see if there are any that are shared. We should have at least one unique classification in each, ie. distinct sets
+            for(int i = 0; i < arm_classifcation.size(); i++){
+                for (int j = 0; j < arm_classifcation.size(); ++j)
+                {
+                    if(i == j){
+                        continue;
+                    }
+                    set<string> res1;
+                    set<string> res2;
+                    set_difference( arm_classifcation[i].begin(), arm_classifcation[i].end(), arm_classifcation[j].begin(), arm_classifcation[j].end(), inserter(res1, res1.begin()));
+                    set_difference( arm_classifcation[j].begin(), arm_classifcation[j].end(), arm_classifcation[i].begin(), arm_classifcation[i].end(), inserter(res2, res2.begin()));
+                    if(res1.size() > 0 && res2.size() > 0){
+                        valid = true;
+                    }
+                }
+            }
+            if(valid){
+                if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+                    cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
+                    for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
+                    {   
+                        cout << read_names[*it2] << " ";
+                    }
+                    cout << endl;
+                    seen_bubbles.insert(it->first);
+                }
+            }
+    	} else if (coverage){
+    		// Can see if there is drastic differences in coverage between the two arms, Assuming that short bubbles can be caused by a sequencing error
+    		// Smaller sequencing errors should have a lower coverage than true variation
+    		bool valid = true;
+    		// We now have each arm of the bubble. Now can compute the coverage for each arm, as the average of the coverage for each read in the arm
+    		if(arms.size() < 2){
+    			continue;
+    		}
+    		vector<float> avg_cov;
+    		for (int i = 0; i < arms.size(); ++i)
+    		{
+    			float tmp = 0.0;
+    			for (int j = 0; j < arms[i].size(); ++j)
+    			{
+    				tmp += read_coverage[arms[i][j]];
+    			}
+    			avg_cov.push_back(tmp);
+    		}
+    		for (int i = 0; i < avg_cov.size(); ++i)
+    		{
+    			for (int j = 0; j < avg_cov.size(); ++j)
+    			{
+    				// Compare the average coverages between arms, ensure that one isn't super low compared to the other
+    				if(i == j) {
+    					continue;
+    				} 
+    				float ratio;
+    				if(avg_cov[i] > avg_cov[j]){
+    					ratio = avg_cov[j]/avg_cov[i];
+    				} else {
+    					ratio = avg_cov[i]/avg_cov[j];
+    				}
+    				if(ratio < 0.25){
+    					valid = false;
+    				}
+    			}
+    		}
+    		if(valid){
+    			if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+	                cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
+	                for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
+	                {   
+	                    cout << read_names[*it2] << " ";
+	                }
+	                cout << endl;
+	                seen_bubbles.insert(it->first);
+	            }
+    		}
+    	} else {
+	        if(MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree)){
+	            // Have Valid Bubble
+	            if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+	                cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
+	                for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
+	                {   
+	                    cout << read_names[*it2] << " ";
+	                }
+	                cout << endl;
+	                seen_bubbles.insert(it->first);
+	            }
+	        }
+	    }
     }
            
   	return 0;

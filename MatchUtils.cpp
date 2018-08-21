@@ -44,8 +44,10 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
         int contained = tmpLine.check_match_contained();
 	    if(contained == 1 && to_drop.count(tmpLine.target_read_id) == 0){
 	        to_drop.insert(tmpLine.target_read_id);
+            //cout << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << "\t" << c5 << "\t" << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << endl; 
 	    } else if (contained == -1 && to_drop.count(tmpLine.query_read_id) == 0) {
 	        to_drop.insert(tmpLine.query_read_id);
+            //cout << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << "\t" << c5 << "\t" << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << endl;
 	    }
         if(chimeric_reads.count(c1) != 0){
             to_drop.insert(c1);
@@ -414,6 +416,67 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
         std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
         bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
     } 
+}
+
+void recurse_bubble_arm(std::string id, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::string>& tmp){
+	if(std::find(tmp.begin(), tmp.end(), id) == tmp.end()){
+		tmp.push_back(id);
+	}
+	// Next check each neighbour of the id
+	// There should only be one neighbour that is in the set of reads
+	// If this read is our end, then return this arm, otherwise recurse to it
+	std::string id_to_take = "";
+	for(int i = 0; i < read_indegree[id].size(); i++){
+        if(reads.count(read_indegree[id][i]) > 0){
+            if(std::find(tmp.begin(), tmp.end(), read_indegree[id][i]) == tmp.end()){
+				// Id is in our read set and we haven't taken it
+				id_to_take = read_indegree[id][i];
+				break;
+			}           
+        }
+    }
+    if(id_to_take == ""){
+	    for(int i = 0; i < read_outdegree[id].size(); i++){
+	        if(reads.count(read_outdegree[id][i]) > 0){
+	            if(std::find(tmp.begin(), tmp.end(), read_outdegree[id][i]) == tmp.end()){
+					// Id is in our read set and we haven't taken it
+					id_to_take = read_outdegree[id][i];
+				}
+	        }
+	    }
+	}
+	if(id_to_take == end){
+		tmp.push_back(id_to_take);
+		return;
+	}
+	if(id_to_take != ""){
+		recurse_bubble_arm(id_to_take, end, reads, read_indegree, read_outdegree, tmp);
+	}
+
+}
+
+void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string> >& arms){
+    // Know that if we get here there is a path between start and end that is seperate from one another.
+    // Check indegree and then outdgree. If we have an edge from start to a read in our read set, then recurse over it, until we get to end
+    for(int i = 0; i < read_indegree[start].size(); i++){
+        if(reads.count(read_indegree[start][i]) > 0){
+            // Edge is valid, take it
+            std::vector<std::string> tmp;
+            tmp.push_back(start);
+            recurse_bubble_arm(read_indegree[start][i], end, reads, read_indegree, read_outdegree, tmp);
+            arms.push_back(tmp);
+        }
+    }
+    for(int i = 0; i < read_outdegree[start].size(); i++){
+        if(reads.count(read_outdegree[start][i]) > 0){
+            // Edge is valid, take it
+            std::vector<std::string> tmp;
+            tmp.push_back(start);
+            recurse_bubble_arm(read_outdegree[start][i], end, reads, read_indegree, read_outdegree, tmp);
+            arms.push_back(tmp);
+        }
+    }
+
 }
 
 bool MatchUtils::check_bubble(std::string start, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree)
