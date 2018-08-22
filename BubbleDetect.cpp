@@ -396,6 +396,10 @@ int main(int argc, char** argv)
         if(tax || coverage){
             MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
         }
+        bool tax_and_cov = false; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
+        bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
+        bool cov_only = false; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
+        bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
     	if(tax && coverage){
     		// Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
     		// And then see if it matches what coverage the arms have
@@ -448,18 +452,9 @@ int main(int argc, char** argv)
                     valid = false;
                 }
             }
-            if(valid){
-                if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-                    cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
-                    for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
-                    {   
-                        cout << read_names[*it2] << " ";
-                    }
-                    cout << endl;
-                    seen_bubbles.insert(it->first);
-                }
-            }
-    	} else if(tax) {
+            tax_and_cov = valid;
+    	}
+        if(tax) {
     		// Can use the taxonomy information to see if the arms have distinct species or subspecies
             // Don't want to have shared lowest level of taxinomic classification between arms
             // I.E. if each arm has a subspecies classification and share reads that have the same species classification, ok
@@ -496,18 +491,9 @@ int main(int argc, char** argv)
                     }
                 }
             }
-            if(valid){
-                if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-                    cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
-                    for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
-                    {   
-                        cout << read_names[*it2] << " ";
-                    }
-                    cout << endl;
-                    seen_bubbles.insert(it->first);
-                }
-            }
-    	} else if (coverage){
+            tax_only = valid;
+    	}
+        if (coverage){
     		// Can see if there is drastic differences in coverage between the two arms, Assuming that short bubbles can be caused by a sequencing error
     		// Smaller sequencing errors should have a lower coverage than true variation
     		bool valid = true;
@@ -523,7 +509,7 @@ int main(int argc, char** argv)
     			{
     				tmp += read_coverage[arms[i][j]];
     			}
-    			avg_cov.push_back(tmp);
+    			avg_cov.push_back(tmp/arms[i].size());
     		}
     		for (int i = 0; i < avg_cov.size(); ++i)
     		{
@@ -544,31 +530,21 @@ int main(int argc, char** argv)
     				}
     			}
     		}
-    		if(valid){
-    			if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-	                cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
-	                for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
-	                {   
-	                    cout << read_names[*it2] << " ";
-	                }
-	                cout << endl;
-	                seen_bubbles.insert(it->first);
-	            }
-    		}
-    	} else {
-	        if(MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree)){
-	            // Have Valid Bubble
-	            if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-	                cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
-	                for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
-	                {   
-	                    cout << read_names[*it2] << " ";
-	                }
-	                cout << endl;
-	                seen_bubbles.insert(it->first);
-	            }
-	        }
-	    }
+    		cov_only = valid;
+    	}
+	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
+	    
+        /*
+        if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+            cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
+            for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
+            {   
+                cout << read_names[*it2] << " ";
+            }
+            cout << endl;
+            seen_bubbles.insert(it->first);
+        }
+        */
     }
            
   	return 0;
