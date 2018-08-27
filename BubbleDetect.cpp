@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     bool chimeric = false;
     bool group = false;
     bool coverage = false;
-    int opt, iterations, fuzz, threshold;
+    int opt, iterations = 10, fuzz = 1000, threshold = 5;
     char group_level = 's';
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, mpa_file, coverage_file;
     while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:x:m:h:")) != EOF)
@@ -54,7 +54,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -o Output Path and Prefix\n -i Iterations#\n -f fuzz\n -t threshold\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n";
         return 0;
     }
 
@@ -324,7 +324,7 @@ int main(int argc, char** argv)
             {
                 n50Output << n50_values[k] << "\n"; 
             }
-            n50Output << "Overall: " << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+            n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
             n50Output.close();
             return 0;
         }
@@ -360,7 +360,7 @@ int main(int argc, char** argv)
 
         std::ofstream n50Output;
         n50Output.open(outputFileName+"_assembly_stats.txt");
-        n50Output << "Overall: " << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+        n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
         n50Output.close();
     }
 
@@ -388,6 +388,8 @@ int main(int argc, char** argv)
     // A true bubble will have reads that only appear in the bubble
     // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
     set<pair<string, string> > seen_bubbles;
+    ofstream bubbleOutput;
+    bubbleOutput.open(outputFileName+"_bubble_list.txt");
     for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
     {    
     	// Four ways of validating.
@@ -533,20 +535,30 @@ int main(int argc, char** argv)
     		cov_only = valid;
     	}
 	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
-	    
-        /*
         if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-            cout << "Bubble Found Between " << read_names[(it->first).first] << " and " << read_names[(it->first).second] << " of size "<< it->second.size() <<" With Nodes: ";
-            for (set<string>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2)
-            {   
-                cout << read_names[*it2] << " ";
+            if(true_bubble || tax_and_cov || tax_only || cov_only){
+                bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t" << it->second.size() << "\t";
+                if(true_bubble){
+                    bubbleOutput << "TrueBubble";
+                }
+                bubbleOutput << "\t";
+                if(tax_and_cov){
+                    bubbleOutput << "TaxonomyAndCoverage";
+                }
+                bubbleOutput << "\t";
+                if(tax_only){
+                    bubbleOutput << "Taxonomy";
+                }
+                bubbleOutput << "\t";
+                if(cov_only){
+                    bubbleOutput << "Coverage";
+                }
+                bubbleOutput << endl;
             }
-            cout << endl;
             seen_bubbles.insert(it->first);
         }
-        */
     }
-           
+    bubbleOutput.close();    
   	return 0;
 }
 

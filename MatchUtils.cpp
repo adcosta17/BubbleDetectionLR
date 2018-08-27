@@ -257,7 +257,7 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
         }
     }
 
-    return string("N50: ") + to_string(n50) + " , Total Length: " + to_string(total_length) + "bp , with " + to_string(contig_lengths.size()) + " contigs. Max Contig: " + to_string(contig_lengths[0]) + "bp";
+    return string("") + to_string(n50) + "\t" + to_string(total_length) + "\t" + to_string(contig_lengths.size()) + "\t" + to_string(contig_lengths[0]);
 }
 
 
