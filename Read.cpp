@@ -34,18 +34,20 @@ Read::Read(std::string i,
 void Read::setTaxonomy(std::vector<std::string>& tmp){
 	for (int i = 0; i < tmp.size(); ++i)
 	{
-		char tax = tmp[i].at(0);
-		std::string val = tmp[i].substr(3);
-		switch(tax){
-			case 's': species = val; break;
-			case 'g': genus = val; break;
-			case 'f': family = val; break;
-			case 'o': order = val; break;
-			case 'c': clas = val; break;
-			case 'p': phylum = val; break;
-			case 'k': kingdom = val; break;
-			case 'd': domain = val; break;
-			default: break;
+		if(tmp[i].length() > 3){
+			char tax = tmp[i].at(0);
+			std::string val = tmp[i].substr(3);
+			switch(tax){
+				case 's': species = val; break;
+				case 'g': genus = val; break;
+				case 'f': family = val; break;
+				case 'o': order = val; break;
+				case 'c': clas = val; break;
+				case 'p': phylum = val; break;
+				case 'k': kingdom = val; break;
+				case 'd': domain = val; break;
+				default: break;
+			}
 		}
 	}	
 }
