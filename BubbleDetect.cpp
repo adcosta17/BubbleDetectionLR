@@ -114,6 +114,10 @@ int main(int argc, char** argv)
     map<string, string> read_lowest_taxonomy;
     map<string, int> classification_count;
     map<string, float> classification_avg_coverage;
+    vector<string> n50_values;
+    std::ofstream n50Output;
+    n50Output.open(outputFileName+"_assembly_stats.txt");
+    bool reduced = false;
     if(tax){
         cerr << "Taxonomy File Detected" << endl;
         map<string, string> species_map;
@@ -176,7 +180,6 @@ int main(int argc, char** argv)
             }
         }
 
-
         if(group){
 
         	// Default is to group by species, done only if we see taxonomy file
@@ -233,7 +236,6 @@ int main(int argc, char** argv)
            	//Prune out any reads that are in a connected component after cleanup, and return rest to pool
             map<string, vector<Match> > graph_edges;
            	set<string> available_reads = read_ids;
-            vector<string> n50_values;
            	for(int i=0; i < sorted_species_counts.size(); i++)
             {
            		string level = sorted_species_counts[i].first;
@@ -278,6 +280,7 @@ int main(int argc, char** argv)
                     MatchUtils::prune_dead_paths(species_matches, ids_to_use, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
                     MatchUtils::clean_matches(species_matches);
                 }
+                reduced = true;
                 read_indegree.clear();
                 read_outdegree.clear();
                 MatchUtils::compute_in_out_degree(species_matches, ids_to_use, read_indegree, read_outdegree);
@@ -316,21 +319,11 @@ int main(int argc, char** argv)
             read_indegree.clear();
             read_outdegree.clear();
             MatchUtils::compute_in_out_degree(graph_edges, read_ids, read_indegree, read_outdegree);
-            MatchUtils::toGfa(graph_edges,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
-
-            std::ofstream n50Output;
-            n50Output.open(outputFileName+"_assembly_stats.txt");
-            for (int k = 0; k < n50_values.size(); k++)
-            {
-                n50Output << n50_values[k] << "\n"; 
-            }
-            n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
-            n50Output.close();
-            return 0;
+            all_matches = graph_edges;
         }
     }
 
-    if(!group) {
+    if(!reduced) {
 
         // Myers Transitive Reduction Alg
         cerr << "Reducing Edges" << endl;
@@ -356,12 +349,6 @@ int main(int argc, char** argv)
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-        MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
-
-        std::ofstream n50Output;
-        n50Output.open(outputFileName+"_assembly_stats.txt");
-        n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
-        n50Output.close();
     }
 
     cerr << "Compute Possible Bubbles" << endl;
@@ -383,11 +370,33 @@ int main(int argc, char** argv)
         }
     }
     // For each candidate bubble check if there is really a bubble between the two
-    cerr << "Validate Possible Bubbles" << endl;
+    cerr << "Validate Possible Bubbles & Pop those that are sequencing error based" << endl;
+    set<pair<string, string> > seen_bubbles;
+    if(tax){
+        for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+        {
+            // Need to find any bubbles that are only true bubbles when taxonomy info is present.
+            // Idea is that bubbles between regions that are all from the same species or subspecies, with no ambiguity should be popped
+            // Ambiguity can occur if each arm of bubble has multiple reads classified to same level but differing classifcation
+            // ie. arm 1 is sub-species A and arm2 is sub-species B. Can't choose between them Vs Arm1 is subspecies A and arm2 is just the main species
+            if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+                vector<vector<string> > arms;
+                MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
+                bool tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
+                bool true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
+                if(true_bubble && ! tax_only){
+                    // This bubble is a true bubble but all the reads can be from the same species or subspecies
+                    // So we can collapse it
+                    MatchUtils::collapseBubble(arms, all_matches);
+                }
+                seen_bubbles.insert(it->first);
+            }
+        }
+    }
+
     // Check to find sets that are unique less the two ends of the pair
     // A true bubble will have reads that only appear in the bubble
     // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
-    set<pair<string, string> > seen_bubbles;
     ofstream bubbleOutput;
     bubbleOutput.open(outputFileName+"_bubble_list.txt");
     for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
@@ -398,141 +407,21 @@ int main(int argc, char** argv)
         if(tax || coverage){
             MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
         }
+        if(arms.size() < 2){
+            continue;
+        }
         bool tax_and_cov = false; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
         bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
         bool cov_only = false; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
         bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
     	if(tax && coverage){
-    		// Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
-    		// And then see if it matches what coverage the arms have
-    		bool valid = true;
-    		// We now have each arm of the bubble. Now can compute the coverage for each arm, as the average of the coverage for each read in the arm
-    		if(arms.size() < 2){
-    			continue;
-    		}
-    		vector<float> avg_cov;
-    		for (int i = 0; i < arms.size(); ++i)
-    		{
-    			float tmp = 0.0;
-    			for (int j = 0; j < arms[i].size(); ++j)
-    			{
-    				tmp += read_coverage[arms[i][j]];
-    			}
-    			avg_cov.push_back(tmp/arms[i].size());
-    		}
-    		// Now need to compute the average coverage for each species/supspecies found in the arm
-    		// First get the species/subspecies in each arm using read_full_taxonomy
-    		// Want to also get the length of each arm as a contig at this spot at well
-            vector<float> arm_tax_cov;
-    		for (int i = 0; i < arms.size(); ++i)
-    		{
-                float tmp = 0.0;
-    			for (int j = 0; j < arms[i].size(); ++j)
-    			{
-    				if(j == 0 || j == arms[i].size()){
-    					//ignore the first read, this is the start, and ignore the last one, the end. These are shared so they shouldn't be used to distinguish arms
-                        continue;
-    				}
-                    // Otherwise get the edge lengths of each overlap, and then weight each read's coverage. Each read should have a classification. 
-                    // If it doesn't then use the read coverage
-                    tmp += classification_avg_coverage[read_full_taxonomy[arms[i][j]]];
-    			}
-                arm_tax_cov.push_back(tmp/arms[i].size());
-    		}
-            // Now that we have the coverage for each arm, and the average coverage based on the taxonomic classifications of the reads in the arm, we can compare and see if they match what we should be seeing
-            // Assumption is that each arm should have similar coverage as the species it comes from. If it does we call it a bubble
-            for (int i = 0; i < avg_cov.size(); ++i)
-            {
-                // Compare the average coverages between the arm itself and the species
-                float ratio;
-                if(avg_cov[i] > arm_tax_cov[i]){
-                    ratio = arm_tax_cov[i]/avg_cov[i];
-                } else {
-                    ratio = avg_cov[i]/arm_tax_cov[i];
-                }
-                if(ratio < 0.75){
-                    valid = false;
-                }
-            }
-            tax_and_cov = valid;
+            tax_and_cov = MatchUtils::validBubbleTaxCov(arms, read_coverage, classification_avg_coverage, read_full_taxonomy);
     	}
         if(tax) {
-    		// Can use the taxonomy information to see if the arms have distinct species or subspecies
-            // Don't want to have shared lowest level of taxinomic classification between arms
-            // I.E. if each arm has a subspecies classification and share reads that have the same species classification, ok
-            // But if they share a subspecies classification, then need to see what percentage of each arm is what subspecies
-            // Base it being a bubble on if it has a majority of one subspecies in each arm (> 75%)
-
-            bool valid = false;
-            if(arms.size() < 2){
-                continue;
-            }
-            vector<set<string> > arm_classifcation;
-            for (int i = 0; i < arms.size(); ++i)
-            {
-                set<string> tmp;
-                for (int j = 0; j < arms[i].size(); ++j)
-                {
-                    tmp.insert(read_lowest_taxonomy[arms[i][j]]);
-                }
-                arm_classifcation.push_back(tmp);
-            }
-            // Now compare the species in each arm to see if there are any that are shared. We should have at least one unique classification in each, ie. distinct sets
-            for(int i = 0; i < arm_classifcation.size(); i++){
-                for (int j = 0; j < arm_classifcation.size(); ++j)
-                {
-                    if(i == j){
-                        continue;
-                    }
-                    set<string> res1;
-                    set<string> res2;
-                    set_difference( arm_classifcation[i].begin(), arm_classifcation[i].end(), arm_classifcation[j].begin(), arm_classifcation[j].end(), inserter(res1, res1.begin()));
-                    set_difference( arm_classifcation[j].begin(), arm_classifcation[j].end(), arm_classifcation[i].begin(), arm_classifcation[i].end(), inserter(res2, res2.begin()));
-                    if(res1.size() > 0 && res2.size() > 0){
-                        valid = true;
-                    }
-                }
-            }
-            tax_only = valid;
+            tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
     	}
         if (coverage){
-    		// Can see if there is drastic differences in coverage between the two arms, Assuming that short bubbles can be caused by a sequencing error
-    		// Smaller sequencing errors should have a lower coverage than true variation
-    		bool valid = true;
-    		// We now have each arm of the bubble. Now can compute the coverage for each arm, as the average of the coverage for each read in the arm
-    		if(arms.size() < 2){
-    			continue;
-    		}
-    		vector<float> avg_cov;
-    		for (int i = 0; i < arms.size(); ++i)
-    		{
-    			float tmp = 0.0;
-    			for (int j = 0; j < arms[i].size(); ++j)
-    			{
-    				tmp += read_coverage[arms[i][j]];
-    			}
-    			avg_cov.push_back(tmp/arms[i].size());
-    		}
-    		for (int i = 0; i < avg_cov.size(); ++i)
-    		{
-    			for (int j = 0; j < avg_cov.size(); ++j)
-    			{
-    				// Compare the average coverages between arms, ensure that one isn't super low compared to the other
-    				if(i == j) {
-    					continue;
-    				} 
-    				float ratio;
-    				if(avg_cov[i] > avg_cov[j]){
-    					ratio = avg_cov[j]/avg_cov[i];
-    				} else {
-    					ratio = avg_cov[i]/avg_cov[j];
-    				}
-    				if(ratio < 0.25){
-    					valid = false;
-    				}
-    			}
-    		}
-    		cov_only = valid;
+    		cov_only = MatchUtils::validBubbleCov(arms, read_coverage);
     	}
 	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
         if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
@@ -558,7 +447,21 @@ int main(int argc, char** argv)
             seen_bubbles.insert(it->first);
         }
     }
-    bubbleOutput.close();    
+    bubbleOutput.close();
+    
+    read_indegree.clear();
+    read_outdegree.clear();
+    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+    MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
+
+    for (int k = 0; k < n50_values.size(); k++)
+    {
+        n50Output << n50_values[k] << "\n"; 
+    }
+    n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+    n50Output.close();
+    
+
   	return 0;
 }
 
