@@ -89,8 +89,9 @@ int main(int argc, char** argv)
         {
             istringstream lin(line);
             string id;
+            int len;
             float cov;
-            lin >> id >> cov;
+            lin >> id >> len >> cov;
             read_coverage.insert(make_pair(id, cov));
         }
     }

@@ -90,6 +90,11 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
             vector<Match> tmp;
             raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
         }
+        if(c1 < c6) {
+            raw_matches[c1].push_back(tmpLine);
+        } else {
+            raw_matches[c6].push_back(tmpLine);
+        }
         if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
             if(c1 == c6){
                 count++;
