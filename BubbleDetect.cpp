@@ -5,10 +5,23 @@
 #include <algorithm>
 #include <regex>
 #include <cstdlib>
+#include <sys/stat.h>
 #include "MatchUtils.hpp"
 
 bool sortSecond(const std::pair<std::string, int>& a, const std::pair<std::string, int>& b){
 	return (a.second > b.second);
+}
+
+bool is_file(const char* path) {
+    struct stat buf;
+    stat(path, &buf);
+    return S_ISREG(buf.st_mode);
+}
+
+bool is_dir(const char* path) {
+    struct stat buf;
+    stat(path, &buf);
+    return S_ISDIR(buf.st_mode);
 }
 
 using namespace std;
@@ -54,7 +67,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -m mpa taxonomy file\n (optional) -x group by level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n";
         return 0;
     }
 
@@ -96,8 +109,17 @@ int main(int argc, char** argv)
         }
     }
 
-    cerr << "Parsing Paf Input File" << endl;
-    int mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, true);
+    int mean_read_length = 0;
+    if(is_file(pafFile.c_str())){
+        cerr << "Parsing Paf Input File" << endl;
+        mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, true);
+    } else if(is_dir(pafFile.c_str())){
+        cerr << "Parsing Paf Input Directory" << endl;
+        mean_read_length = MatchUtils::read_paf_dir(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification);
+    } else {
+        cerr << "Input provided is neither file nor directory" << endl;
+        return 0;
+    }
     cerr << read_ids.size() << " Unique Reads found in File"<< endl;
     cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
     map<string, vector<string> > read_indegree; // Number of times read is target
@@ -236,7 +258,6 @@ int main(int argc, char** argv)
            	//Iterate over the now sorted list of groups, filter reads for each group, assemble them
            	//Prune out any reads that are in a connected component after cleanup, and return rest to pool
             map<string, vector<Match> > graph_edges;
-           	set<string> available_reads = read_ids;
            	for(int i=0; i < sorted_species_counts.size(); i++)
             {
            		string level = sorted_species_counts[i].first;
@@ -252,20 +273,17 @@ int main(int argc, char** argv)
                     }
                 }
                 // Compute difference between all valid ids and ids that are available
-                set<string> ids_to_use;
-                set_intersection(available_reads.begin(), available_reads.end(), ids_for_group.begin(), ids_for_group.end(), inserter(ids_to_use, ids_to_use.begin()));
-            
                 // Now that we have set of ids to use, prune all overlaps to get subset of valid overlaps to use for assembly
                 map<string, vector<Match> > species_matches;
                 map<string, vector<Match> > species_edge_lists;
-                MatchUtils::subset_matches(all_matches, edge_lists, species_matches, species_edge_lists, ids_to_use);
-                cerr << "Using " << ids_to_use.size() << " reads" << endl;
+                MatchUtils::subset_matches(all_matches, edge_lists, species_matches, species_edge_lists, ids_for_group);
+                cerr << "Using " << ids_for_group.size() << " reads" << endl;
                 // Myers Transitive Reduction Alg
                 cerr << "\tReducing Edges" << endl;
-                MatchUtils::reduce_edges(species_matches, ids_to_use, species_edge_lists, fuzz);
+                MatchUtils::reduce_edges(species_matches, ids_for_group, species_edge_lists, fuzz);
                 read_indegree.clear();
                 read_outdegree.clear();
-                MatchUtils::compute_in_out_degree(species_matches, ids_to_use, read_indegree, read_outdegree);
+                MatchUtils::compute_in_out_degree(species_matches, ids_for_group, read_indegree, read_outdegree);
                 cerr << "\tDropping Reduced Edges" << endl;
                 MatchUtils::clean_matches(species_matches);
                 cerr << "\tPruning Dead Ends" << endl;
@@ -275,31 +293,28 @@ int main(int argc, char** argv)
                     map<string, vector<string> > de_paths;
                     read_indegree.clear();
                     read_outdegree.clear();
-                    MatchUtils::compute_in_out_degree(species_matches, ids_to_use, read_indegree, read_outdegree);
+                    MatchUtils::compute_in_out_degree(species_matches, ids_for_group, read_indegree, read_outdegree);
                     // Prune Dead End Reads
-                    MatchUtils::compute_dead_ends(species_matches, ids_to_use,read_indegree, read_outdegree, de_ids, de_paths);
-                    MatchUtils::prune_dead_paths(species_matches, ids_to_use, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
+                    MatchUtils::compute_dead_ends(species_matches, ids_for_group,read_indegree, read_outdegree, de_ids, de_paths);
+                    MatchUtils::prune_dead_paths(species_matches, ids_for_group, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
                     MatchUtils::clean_matches(species_matches);
                 }
                 reduced = true;
                 read_indegree.clear();
                 read_outdegree.clear();
-                MatchUtils::compute_in_out_degree(species_matches, ids_to_use, read_indegree, read_outdegree);
-                string n50_val = MatchUtils::compute_n50(species_matches, read_indegree, read_outdegree, ids_to_use);
-                if(n50_val != ""){
-                    n50_values.push_back(level + "\n" + n50_val);
-                }
+                MatchUtils::compute_in_out_degree(species_matches, ids_for_group, read_indegree, read_outdegree);
+                //string n50_val = MatchUtils::compute_n50(species_matches, read_indegree, read_outdegree, ids_for_group);
+                //if(n50_val != ""){
+                //    n50_values.push_back(level + "\n" + n50_val);
+                //}
                 // Need to compute set of reads that was actually used and then remove them from the valid read set
                 set<string> reads_in_graph;
-                for (set<string>::iterator it=ids_to_use.begin(); it!=ids_to_use.end(); ++it){
+                for (set<string>::iterator it=ids_for_group.begin(); it!=ids_for_group.end(); ++it){
                     if(read_outdegree[*it].size() > 0 || read_indegree[*it].size() > 0){
                         // Read is in connected componenet, add to set to drop
                         reads_in_graph.insert(*it);
                     }
                 }
-                set<string> diff;
-                set_difference(available_reads.begin(), available_reads.end(), reads_in_graph.begin(), reads_in_graph.end(), inserter(diff, diff.begin()));
-                available_reads = diff;
 
                 // Then we also need to take the overlaps for this species and add it to the master set of overalps to look at that are valid
                 // This valid set is what we will call bubbles on
@@ -312,7 +327,30 @@ int main(int argc, char** argv)
                     for (int j = 0; j < it->second.size(); ++j)
                     {
                         if(!it->second[j].reduce){
-                            graph_edges[it->first].push_back(it->second[j]);
+                            // Check if edge is already in ourset of graph edges, Don't want duplicates
+                            // Check the set indexed by the query read and then the target
+                            bool found = false;
+                            if(graph_edges.count(it->second[j].query_read_id) != 0){
+                                for(int k = 0; k < graph_edges[it->second[j].query_read_id].size(); k++){
+                                    if((graph_edges[it->second[j].query_read_id][k].query_read_id == it->second[j].query_read_id && graph_edges[it->second[j].query_read_id][k].target_read_id == it->second[j].target_read_id) ||
+                                        (graph_edges[it->second[j].query_read_id][k].target_read_id == it->second[j].query_read_id && graph_edges[it->second[j].query_read_id][k].query_read_id == it->second[j].target_read_id)){
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if(!found && graph_edges.count(it->second[j].target_read_id) != 0){
+                                for(int k = 0; k < graph_edges[it->second[j].target_read_id].size(); k++){
+                                    if((graph_edges[it->second[j].target_read_id][k].query_read_id == it->second[j].query_read_id && graph_edges[it->second[j].target_read_id][k].target_read_id == it->second[j].target_read_id) ||
+                                        (graph_edges[it->second[j].target_read_id][k].target_read_id == it->second[j].query_read_id && graph_edges[it->second[j].target_read_id][k].query_read_id == it->second[j].target_read_id)){
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if(!found){
+                                graph_edges[it->first].push_back(it->second[j]);
+                            }
                         }
                     }
                 }
@@ -450,6 +488,7 @@ int main(int argc, char** argv)
     }
     bubbleOutput.close();
     
+    cerr << "Output GFA: "<< outputFileName << ".gfa" << endl;
     read_indegree.clear();
     read_outdegree.clear();
     MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);

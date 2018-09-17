@@ -100,3 +100,20 @@ std::string Read::getClassification(char level){
 
 	return "";
 }
+
+std::string Read::getClassificationForFileName(char level){
+
+	switch(level){
+		case 's': {if(species != "") return getClassificationForFileName('g') + "_" + species;} break;
+		case 'g': {if(genus != "") return getClassificationForFileName('f') + "_" + genus;} break;
+		case 'f': {if(family != "") return getClassificationForFileName('o') + "_" + family;} break;
+		case 'o': {if(order != "") return getClassificationForFileName('c') + "_" + order;} break;
+		case 'c': {if(clas != "") return getClassificationForFileName('p') + "_" + clas;} break;
+		case 'p': {if(phylum != "") return getClassificationForFileName('k') + "_" + phylum;} break;
+		case 'k': {return getClassificationForFileName('d') + "_" + kingdom;} break; // Kingdom can be empty for Bacteria
+		case 'd': return domain;
+		default: return "";
+	}
+
+	return "";
+}

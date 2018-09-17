@@ -7,16 +7,17 @@
 #include <list>
 #include <utility>
 #include <cmath>
+
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>    
-
 namespace io = boost::iostreams;
+
+#include <dirent.h>
 
 #include "MatchUtils.hpp"
 
-int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
-{
+void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name){
 	using namespace std;
     io::filtering_istream in_filter;
     in_filter.push(io::gzip_decompressor());
@@ -24,9 +25,6 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 
 	//ifstream inputFile_filter(file_name);
 	string line;
-    set<string> to_drop;
-    cerr << "Checking for Contained Reads" << endl;
-    int count = 0;
 	while (getline(in_filter, line, '\n'))
 	{
 		istringstream lin(line);
@@ -56,14 +54,16 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
             to_drop.insert(c6);
         }
     }
-	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
-	cerr << "Reading in all valid Matches" << endl;
+}
+
+std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop){
+	using namespace std;
+
 	io::filtering_istream in;
     in.push(io::gzip_decompressor());
     in.push(io::file_source(file_name));
-    count = 0;
     vector<int> sizes;
-    read_ids.clear();
+    string line;
 	while (getline(in, line, '\n'))
 	{
         // Each line of input is split into columns
@@ -96,15 +96,11 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
             raw_matches[c6].push_back(tmpLine);
         }
         if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
-            if(c1 == c6){
-                count++;
-            }
             continue;
         }
         // Match is not long enough
         if((c4 - c3) < 2000 || (c9 - c8) < 2000 || c10 < 100){
         	//cerr << c4 - c3 << " " << c8 - c7  << endl;
-            count++;
         	continue;
         }
         // Check that the alignments are proper, and at the ends of reads, if not edge reduction will fail    	
@@ -152,45 +148,85 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 	        if(read_lengths.count(c1) == 0){
 	            read_lengths.insert(pair<string, int>(c1, c2));
                 sizes.push_back(c2);
-                count += 1;
 	        }
 	        if(read_lengths.count(c6) == 0){
 	            read_lengths.insert(pair<string, int>(c6, c7));
                 sizes.push_back(c7);
-                count += 1;
 	        }
-    	} else {
-            count++;
-        }
+    	}
+    }
+    return sizes;
+}
 
-    }
-    cerr << count << " Self Matches and/or Internal Matches removed" << endl;
-    // Drop any reads found to be contained, Drop all entries to them from all_matches
-    for (map<string, vector<Match> >::iterator it2=all_matches.begin(); it2!=all_matches.end(); ++it2)
-    {
-        for (int i = 0; i < it2->second.size(); ++i)
-        {
-            if(to_drop.count(it2->second[i].target_read_id) != 0){
-                it2->second[i].reduce = true;
-            }
-            if(to_drop.count(it2->second[i].query_read_id) != 0){
-                it2->second[i].reduce = true;
-            }
+int MatchUtils::read_paf_dir(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification){
+	using namespace std;
+	set<string> paf_files;
+	DIR *dir;
+	struct dirent *ent;
+	string suffix = ".ava.gz";
+	if ((dir = opendir (file_name.c_str())) != NULL) {
+	  /* print all the files and directories within directory */
+	  while ((ent = readdir (dir)) != NULL) {
+	  	if (string(ent->d_name).length() >= suffix.length()) {
+        	if (0 == string(ent->d_name).compare (string(ent->d_name).length() - suffix.length(), suffix.length(), suffix)){
+	    		paf_files.insert(file_name + "/" + string(ent->d_name));
+        	}
         }
-    }
-    for (map<string, vector<Match> >::iterator it2=edge_lists.begin(); it2!=edge_lists.end(); ++it2)
-    {
-    	Match::sort_matches(it2->second);
-        for (int i = 0; i < it2->second.size(); ++i)
-        {
-            if(to_drop.count(it2->second[i].target_read_id) != 0){
-                it2->second[i].reduce = true;
-            }
-            if(to_drop.count(it2->second[i].query_read_id) != 0){
-                it2->second[i].reduce = true;
-            }
-        }
-    }
+	  }
+	  closedir (dir);
+	} else {
+	  /* could not open directory */
+	  cerr << "ERROR: Could not open " << file_name << endl; 
+	  return 0;
+	}
+
+	// Take the list of paf_files and then for each of them read in the file
+	set<string> to_drop;
+	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+		get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, *it);
+	}
+	read_ids.clear();
+	// Now that we have the contained read, read in the files again and then merge the contents after every pass into our complete set
+	map<string, vector<Match>> tmp_edge_lists;
+	map<string, vector<Match>> tmp_all_matches;
+	map<string, vector<Match>> tmp_raw_matches;
+	set<string> tmp_read_ids;
+	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+		get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, read_ids, read_lengths, *it, read_classification, to_drop);
+		// need to combine out tmp sets with the actual sets, ensuring to not add duplicate matches
+		for (map<string, vector<Match>>::iterator it = tmp_edge_lists.begin(); it != tmp_edge_lists.end(); ++it)
+		{
+			if(edge_lists.count(it->first) == 0){
+				edge_lists.insert(make_pair(it->first, it->second));
+				continue;
+			}
+			for (int i = 0; i < it->second.size(); ++i)
+			{
+				
+			}
+		}
+	}
+}
+
+int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
+{
+	using namespace std;
+    io::filtering_istream in_filter;
+    in_filter.push(io::gzip_decompressor());
+    in_filter.push(io::file_source(file_name));
+
+	//ifstream inputFile_filter(file_name);
+	string line;
+    set<string> to_drop;
+    int count = 0;
+    cerr << "Checking for Contained Reads" << endl;
+    get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name);
+	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
+	cerr << "Reading in all valid Matches" << endl;
+
+	read_ids.clear();
+	vector<int> sizes = get_all_matches_for_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop);
+
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
 }
 
@@ -357,7 +393,7 @@ bool MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms,
 std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids){
     // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
     // Don't want to fully visualize as we need to see where each read comes from
-    // Concensus step of OLC format
+    // Last step of Layout phase in OLC
     // Look for nodes that are branches. Iterate along each branch and add overlaps to list of edges against respective contig
     // Keep going until we get to a node that is a branch, in either direction.
 
@@ -403,6 +439,9 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
                 }
             }
             len += it->second[i].length;
+        }
+        if(it->second.size() > 1){
+            cerr << "Contig Between: " << len << " " << it->second[0].query_read_id << " : " << it->second[0].target_read_id << " and " << it->second[it->second.size() -1].query_read_id << " : " << it->second[it->second.size() -1].target_read_id << endl;
         }
         contig_lengths.push_back(len);
         total_length += len;

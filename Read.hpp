@@ -23,5 +23,6 @@ public:
 
 	void setTaxonomy(std::vector<std::string>& tmp);
 	std::string getClassification(char level);
+	std::string getClassificationForFileName(char level);
 	bool parentLevel(std::string level);
 };
