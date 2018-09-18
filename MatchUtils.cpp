@@ -393,6 +393,7 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::vector<Match> >& all_matches){
     // Keep the first arm and remove the rest
     if(arms.size() < 2){
+    	//std::cout << "Not enough arms" << std::endl;
         return;
     }
     for (int i = 1; i < arms.size(); ++i)
@@ -407,6 +408,7 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
                 for(int k = 0; k < all_matches[first].size(); k++){
                     if(all_matches[first][k].query_read_id == second || all_matches[first][k].target_read_id == second){
                         all_matches[first][k].reduce = true;
+                        //std::cout << "Reduced: "<< all_matches[first][k].query_read_id << " to " << all_matches[first][k].target_read_id << std::endl;
                         break;
                     }
                 }
@@ -414,6 +416,7 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
                 for(int k = 0; k < all_matches[second].size(); k++){
                     if(all_matches[second][k].query_read_id == first || all_matches[second][k].target_read_id == first){
                         all_matches[second][k].reduce = true;
+                        //std::cout << "Reduced: "<< all_matches[second][k].query_read_id << " to " << all_matches[second][k].target_read_id << std::endl;
                         break;
                     }
                 }
@@ -601,7 +604,7 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
             len += it->second[i].length;
         }
         if(it->second.size() > 1){
-            cerr << "Contig Between: " << len << " " << it->second[0].query_read_id << " : " << it->second[0].target_read_id << " and " << it->second[it->second.size() -1].query_read_id << " : " << it->second[it->second.size() -1].target_read_id << endl;
+            //cerr << "Contig Between: " << len << " " << it->second[0].query_read_id << " : " << it->second[0].target_read_id << " and " << it->second[it->second.size() -1].query_read_id << " : " << it->second[it->second.size() -1].target_read_id << endl;
         }
         contig_lengths.push_back(len);
         total_length += len;

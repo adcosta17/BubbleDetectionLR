@@ -392,7 +392,6 @@ int main(int argc, char** argv)
 
     cerr << "Compute Possible Bubbles" << endl;
     //Find Paths to each node from a given start
-    map<string, string>  bubble_pairs;
     map<pair<string,string>, set<string> > bubble_sets;
     for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
@@ -403,8 +402,8 @@ int main(int argc, char** argv)
             // If we get to a node we have already seen then we have a bubble, and can compute the paths between the start and this node
             //cout << "Checking Branch " << *it << " For Bubble" << endl;
             MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
-        } else if(read_outdegree[*it].size() >= 2){
-            //cout << "Checking Branch " << *it << " For Bubble" << endl;
+        }
+        if(read_outdegree[*it].size() >= 2){
             MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
         }
     }
@@ -423,7 +422,44 @@ int main(int argc, char** argv)
                 MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
                 bool tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
                 bool true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
-                if(true_bubble && ! tax_only){
+                if(true_bubble && !tax_only){
+                    // This bubble is a true bubble but all the reads can be from the same species or subspecies
+                    // So we can collapse it
+                    MatchUtils::collapseBubble(arms, all_matches);
+                }
+                seen_bubbles.insert(it->first);
+            }
+        }
+    }
+
+    bubble_sets.clear();
+    read_indegree.clear();
+    read_outdegree.clear();
+    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        //Look for nodes that have at least 2 valid neighbours
+        if(read_indegree[*it].size() >= 2){
+            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
+        }
+        if(read_outdegree[*it].size() >= 2){
+            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
+        }
+    }
+    seen_bubbles.clear();
+    if(tax){
+        for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+        {
+            // Need to find any bubbles that are only true bubbles when taxonomy info is present.
+            // Idea is that bubbles between regions that are all from the same species or subspecies, with no ambiguity should be popped
+            // Ambiguity can occur if each arm of bubble has multiple reads classified to same level but differing classifcation
+            // ie. arm 1 is sub-species A and arm2 is sub-species B. Can't choose between them Vs Arm1 is subspecies A and arm2 is just the main species
+            if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+                vector<vector<string> > arms;
+                MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
+                bool tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
+                bool true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
+                if(true_bubble && !tax_only){
                     // This bubble is a true bubble but all the reads can be from the same species or subspecies
                     // So we can collapse it
                     MatchUtils::collapseBubble(arms, all_matches);
