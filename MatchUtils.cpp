@@ -187,13 +187,20 @@ int MatchUtils::read_paf_dir(std::map<std::string, std::vector<Match> >& edge_li
 	}
 	read_ids.clear();
 	// Now that we have the contained read, read in the files again and then merge the contents after every pass into our complete set
-	map<string, vector<Match>> tmp_edge_lists;
-	map<string, vector<Match>> tmp_all_matches;
-	map<string, vector<Match>> tmp_raw_matches;
-	set<string> tmp_read_ids;
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
-		get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, read_ids, read_lengths, *it, read_classification, to_drop);
+        map<string, vector<Match>> tmp_edge_lists;
+        map<string, vector<Match>> tmp_all_matches;
+        map<string, vector<Match>> tmp_raw_matches;
+        set<string> tmp_read_ids;
+		get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, *it, read_classification, to_drop);
 		// need to combine out tmp sets with the actual sets, ensuring to not add duplicate matches
+
+        for(set<string>::iterator it = tmp_read_ids.begin(); it != tmp_read_ids.end(); ++it){
+            if(read_ids.count(*it) == 0){
+                read_ids.insert(*it);
+            }
+        }
+
 		for (map<string, vector<Match>>::iterator it = tmp_edge_lists.begin(); it != tmp_edge_lists.end(); ++it)
 		{
 			if(edge_lists.count(it->first) == 0){
@@ -202,10 +209,163 @@ int MatchUtils::read_paf_dir(std::map<std::string, std::vector<Match> >& edge_li
 			}
 			for (int i = 0; i < it->second.size(); ++i)
 			{
-				
+				// Check the edge list for just the query read
+                // Because of the way we add edges we know that if the query reads vector has the edge then the target will have it also and vice versa
+                string q = it->second[i].query_read_id;
+                string t = it->second[i].target_read_id;
+                // Its possible that we haven't seen this read before
+                // Since we could have an edge that is between something we have seen and something we haven't
+                //  q might be the thing we haven't seen, which means that we will have HAVE to have seen t already
+                //  based on the if statement check above
+                bool found = false;
+                if(edge_lists.count(q) > 0){
+                    for(int j = 0; j < edge_lists[q].size(); j++){
+                        if((edge_lists[q][j].query_read_id == q && edge_lists[q][j].target_read_id == t) ||
+                            (edge_lists[q][j].query_read_id == t && edge_lists[q][j].target_read_id == q)) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(!found){
+                        // Didn't find an entry so we should add ours to the respective lists
+                        edge_lists[q].push_back(it->second[i]);
+                        if(edge_lists.count(t) == 0){
+                            vector<Match> tmp;
+                            edge_lists.insert(make_pair(t, tmp));
+                        }
+                        edge_lists[t].push_back(it->second[i]);
+                    }
+                } else if(edge_lists.count(t) > 0){
+                    for(int j = 0; j < edge_lists[t].size(); j++){
+                        if((edge_lists[t][j].query_read_id == q && edge_lists[t][j].target_read_id == t) ||
+                            (edge_lists[t][j].query_read_id == t && edge_lists[t][j].target_read_id == q)) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if(!found){
+                        // Didn't find an entry so we should add ours to the respective lists
+                        edge_lists[t].push_back(it->second[i]);
+                        if(edge_lists.count(q) == 0){
+                            vector<Match> tmp;
+                            edge_lists.insert(make_pair(q, tmp));
+                        }
+                        edge_lists[q].push_back(it->second[i]);
+                    }
+                } else {
+                    // We shouldn't get here
+                }
 			}
 		}
+
+        for (map<string, vector<Match>>::iterator it = tmp_raw_matches.begin(); it != tmp_raw_matches.end(); ++it)
+        {
+            if(raw_matches.count(it->first) == 0){
+                raw_matches.insert(make_pair(it->first, it->second));
+                continue;
+            }
+            for (int i = 0; i < it->second.size(); ++i)
+            {
+                // Check the edge list for just the query read
+                // Because of the way we add edges we know that if the query reads vector has the edge then the target will have it also and vice versa
+                string q = it->second[i].query_read_id;
+                string t = it->second[i].target_read_id;
+                bool found = false;
+                if(q < t){
+                    // Edge should be indexed via q
+                    if(raw_matches.count(q) > 0){
+                        for (int j = 0; j < raw_matches[q].size(); ++j)
+                        {
+                            if((raw_matches[q][j].query_read_id == q && raw_matches[q][j].target_read_id == t) ||
+                                (raw_matches[q][j].query_read_id == t && raw_matches[q][j].target_read_id == q)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        vector<Match> tmp;
+                        raw_matches.insert(make_pair(q, tmp));
+                    }
+                    if(!found){
+                        raw_matches[q].push_back(it->second[i]);
+                    }
+                } else {
+                    // Edge should be indexed via t
+                    if(raw_matches.count(t) > 0){
+                        for (int j = 0; j < raw_matches[t].size(); ++j)
+                        {
+                            if((raw_matches[t][j].query_read_id == q && raw_matches[t][j].target_read_id == t) ||
+                                (raw_matches[t][j].query_read_id == t && raw_matches[t][j].target_read_id == q)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        vector<Match> tmp;
+                        raw_matches.insert(make_pair(t, tmp));
+                    }
+                    if(!found){
+                        raw_matches[t].push_back(it->second[i]);
+                    }
+                }
+            }
+        }
+
+        for (map<string, vector<Match>>::iterator it = tmp_all_matches.begin(); it != tmp_all_matches.end(); ++it)
+        {
+            if(all_matches.count(it->first) == 0){
+                all_matches.insert(make_pair(it->first, it->second));
+                continue;
+            }
+            for (int i = 0; i < it->second.size(); ++i)
+            {
+                // Check the edge list for just the query read
+                // Because of the way we add edges we know that if the query reads vector has the edge then the target will have it also and vice versa
+                string q = it->second[i].query_read_id;
+                string t = it->second[i].target_read_id;
+                bool found = false;
+                if(q < t){
+                    // Edge should be indexed via q
+                    if(all_matches.count(q) > 0){
+                        for (int j = 0; j < all_matches[q].size(); ++j)
+                        {
+                            if((all_matches[q][j].query_read_id == q && all_matches[q][j].target_read_id == t) ||
+                                (all_matches[q][j].query_read_id == t && all_matches[q][j].target_read_id == q)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        vector<Match> tmp;
+                        all_matches.insert(make_pair(q, tmp));
+                    }
+                    if(!found){
+                        all_matches[q].push_back(it->second[i]);
+                    }
+                } else {
+                    // Edge should be indexed via t
+                    if(all_matches.count(t) > 0){
+                        for (int j = 0; j < all_matches[t].size(); ++j)
+                        {
+                            if((all_matches[t][j].query_read_id == q && all_matches[t][j].target_read_id == t) ||
+                                (all_matches[t][j].query_read_id == t && all_matches[t][j].target_read_id == q)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        vector<Match> tmp;
+                        all_matches.insert(make_pair(t, tmp));
+                    }
+                    if(!found){
+                        all_matches[t].push_back(it->second[i]);
+                    }
+                }
+            }
+        }
 	}
+
+
 }
 
 int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
