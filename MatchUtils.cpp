@@ -32,11 +32,21 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     	char c5;
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
-        getline(lin, meta);
-        Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,"");
+        //getline(lin, meta);
         read_ids.insert(c1);
         read_ids.insert(c6);
-        if(to_drop.count(c1) > 0 || to_drop.count(c6) > 0 || tmpLine.internal_edge()){
+        if(to_drop.count(c1) > 0 || to_drop.count(c6) > 0 ){
+        	continue;
+        }
+        if(chimeric_reads.count(c1) != 0){
+            to_drop.insert(c1);
+        }
+        if(chimeric_reads.count(c6) != 0){
+            to_drop.insert(c6);
+            continue;
+        }
+        Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,"");
+        if(tmpLine.internal_edge()){
         	continue;
         }
         int contained = tmpLine.check_match_contained();
@@ -47,12 +57,6 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
 	        to_drop.insert(tmpLine.query_read_id);
             //cout << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << "\t" << c5 << "\t" << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << endl;
 	    }
-        if(chimeric_reads.count(c1) != 0){
-            to_drop.insert(c1);
-        }
-        if(chimeric_reads.count(c6) != 0){
-            to_drop.insert(c6);
-        }
     }
 }
 
@@ -163,14 +167,15 @@ int MatchUtils::read_paf_dir(std::map<std::string, std::vector<Match> >& edge_li
 	set<string> paf_files;
 	DIR *dir;
 	struct dirent *ent;
-	string suffix = ".ava.gz";
+	string suffix = ".ava.paf.gz";
 	if ((dir = opendir (file_name.c_str())) != NULL) {
 	  /* print all the files and directories within directory */
 	  while ((ent = readdir (dir)) != NULL) {
-	  	if (string(ent->d_name).length() >= suffix.length()) {
-        	if (0 == string(ent->d_name).compare (string(ent->d_name).length() - suffix.length(), suffix.length(), suffix)){
-	    		paf_files.insert(file_name + "/" + string(ent->d_name));
-        	}
+	  	string name(ent->d_name);
+	  	//cerr << name << endl;
+	  	if (name.find(suffix) != string::npos){
+	    	paf_files.insert(file_name + "/" + name);
+	    	//cerr << file_name + "/" + name << endl;
         }
 	  }
 	  closedir (dir);
@@ -179,19 +184,32 @@ int MatchUtils::read_paf_dir(std::map<std::string, std::vector<Match> >& edge_li
 	  cerr << "ERROR: Could not open " << file_name << endl; 
 	  return 0;
 	}
+	cerr << "Found " << paf_files.size() << " Paf Files" << endl;
 
 	// Take the list of paf_files and then for each of them read in the file
 	set<string> to_drop;
+	cerr << "Caculating Contained Reads" << endl;
+	int count = 0;
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
 		get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, *it);
+		count++;
+		if(count % 20 == 0){
+			cerr << "Processed " << count << " Pafs" << endl;
+		}
 	}
+	count = 0;
 	read_ids.clear();
 	// Now that we have the contained read, read in the files again and then merge the contents after every pass into our complete set
+	cerr << "Reading in Valid Matches and merging overlap sets" << endl; 
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         map<string, vector<Match>> tmp_edge_lists;
         map<string, vector<Match>> tmp_all_matches;
         map<string, vector<Match>> tmp_raw_matches;
         set<string> tmp_read_ids;
+        count++;
+		if(count % 20 == 0){
+			cerr << "Processed " << count << " Pafs" << endl;
+		}
 		get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, *it, read_classification, to_drop);
 		// need to combine out tmp sets with the actual sets, ensuring to not add duplicate matches
 
