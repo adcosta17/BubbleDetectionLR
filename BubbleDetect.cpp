@@ -127,6 +127,7 @@ int main(int argc, char** argv)
         cerr << "Dropping Reduced Edges" << endl;
         MatchUtils::clean_matches(all_matches);
         cerr << "Pruning Dead Ends" << endl;
+        int rm_edge = 0;
         for (int i = 0; i < iterations; ++i)
         {
             set<string> de_ids;
@@ -136,9 +137,10 @@ int main(int argc, char** argv)
             MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
             // Prune Dead End Reads
             MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
-            MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
+            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
             MatchUtils::clean_matches(all_matches);
         }
+        cerr << "\tRemoved " << rm_edge << " Edges" << endl;
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
