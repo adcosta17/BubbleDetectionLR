@@ -115,7 +115,7 @@ int main(int argc, char** argv)
         return 0;
     } else if(is_file(pafFile.c_str())){
         cerr << "Parsing Paf Input File" << endl;
-        mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, true);
+        mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, false);
         cerr << read_ids.size() << " Unique Reads found in File"<< endl;
         cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
         // Myers Transitive Reduction Alg
@@ -321,12 +321,12 @@ int main(int argc, char** argv)
         if(tax || coverage){
             MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
         }
-        if(arms.size() < 2){
+        if(arms.size() != 2){
             continue;
         }
-        bool tax_and_cov = false; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
+        vector<float> tax_and_cov; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
         bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
-        bool cov_only = false; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
+        float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
         bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
     	if(tax && coverage){
             tax_and_cov = MatchUtils::validBubbleTaxCov(arms, read_coverage, classification_avg_coverage, read_full_taxonomy);
@@ -338,26 +338,32 @@ int main(int argc, char** argv)
     		cov_only = MatchUtils::validBubbleCov(arms, read_coverage);
     	}
 	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
+	    float arm_ratio = MatchUtils::getArmLengthRatio(arms, all_matches);
+
         if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-            if(true_bubble || tax_and_cov || tax_only || cov_only){
-                bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t" << it->second.size() << "\t";
-                if(true_bubble){
-                    bubbleOutput << "TrueBubble";
-                }
-                bubbleOutput << "\t";
-                if(tax_and_cov){
-                    bubbleOutput << "TaxonomyAndCoverage";
-                }
-                bubbleOutput << "\t";
-                if(tax_only){
-                    bubbleOutput << "Taxonomy";
-                }
-                bubbleOutput << "\t";
-                if(cov_only){
-                    bubbleOutput << "Coverage";
-                }
-                bubbleOutput << endl;
+            
+            bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t" << it->second.size() << "\t";
+            if(true_bubble){
+                bubbleOutput << 1;
+            } else {
+                bubbleOutput << 0;
             }
+            bubbleOutput << "\t";
+            if(tax_and_cov.size() == 2){
+                bubbleOutput << tax_and_cov[0] << "\t" << tax_and_cov[1];
+            } else {
+                bubbleOutput << 0 << "\t" << 0;
+            }
+            bubbleOutput << "\t";
+            if(tax_only){
+                bubbleOutput << 1;
+            } else {
+                bubbleOutput << 0;
+            }
+            bubbleOutput << "\t";
+            bubbleOutput << cov_only;
+            bubbleOutput << endl;
+            
             seen_bubbles.insert(it->first);
         }
     }

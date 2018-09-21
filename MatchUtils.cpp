@@ -17,7 +17,7 @@ namespace io = boost::iostreams;
 
 #include "MatchUtils.hpp"
 
-void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name){
+void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name, bool reads){
 	using namespace std;
     io::filtering_istream in_filter;
     in_filter.push(io::gzip_decompressor());
@@ -33,8 +33,10 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
         //getline(lin, meta);
-        read_ids.insert(c1);
-        read_ids.insert(c6);
+        if(reads){
+        	read_ids.insert(c1);
+        	read_ids.insert(c6);
+    	}
         if(to_drop.count(c1) > 0 || to_drop.count(c6) > 0 ){
         	continue;
         }
@@ -60,7 +62,7 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     }
 }
 
-std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop){
+std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, bool raw){
 	using namespace std;
 
 	io::filtering_istream in;
@@ -86,18 +88,20 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
         //cerr << cg << endl;
         // Check for self alignments && contained reads
         Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,cg);
-        if(raw_matches.count(c1) == 0){
-            vector<Match> tmp;
-            raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
-        }
-        if(raw_matches.count(c6) == 0){
-            vector<Match> tmp;
-            raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
-        }
-        if(c1 < c6) {
-            raw_matches[c1].push_back(tmpLine);
-        } else {
-            raw_matches[c6].push_back(tmpLine);
+        if(raw){
+	        if(raw_matches.count(c1) == 0){
+	            vector<Match> tmp;
+	            raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
+	        }
+	        if(raw_matches.count(c6) == 0){
+	            vector<Match> tmp;
+	            raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
+	        }
+        	if(c1 < c6) {
+            	raw_matches[c1].push_back(tmpLine);
+        	} else {
+            	raw_matches[c6].push_back(tmpLine);
+        	}
         }
         if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
             continue;
@@ -141,14 +145,6 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
 
 	        read_ids.insert(c1);
 	        read_ids.insert(c6);
-            if(read_classification.count(c1) == 0){
-                Read tmp = Read(c1, c2);
-                read_classification.insert(make_pair(c1, tmp));
-            }
-            if(read_classification.count(c6) == 0){
-                Read tmp = Read(c6, c7);
-                read_classification.insert(make_pair(c6, tmp));
-            }
 	        if(read_lengths.count(c1) == 0){
 	            read_lengths.insert(pair<string, int>(c1, c2));
                 sizes.push_back(c2);
@@ -198,7 +194,7 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
         cerr << "Assembling " << name << endl;
         set<string> to_drop;
         set<string> tmp_read_ids;
-		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp);
+		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
 		count++;
 		
         tmp_read_ids.clear();
@@ -208,7 +204,7 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
         map<string, vector<Match>> tmp_raw_matches;
         map<string, vector<string> > read_indegree;
         map<string, vector<string> > read_outdegree;
-		vector<int> sizes = get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop);
+		vector<int> sizes = get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, false);
         if(sizes.size() == 0){
             continue;
         }
@@ -304,12 +300,12 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
     set<string> to_drop;
     int count = 0;
     cerr << "Checking for Contained Reads" << endl;
-    get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name);
+    get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name, true);
 	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
 	cerr << "Reading in all valid Matches" << endl;
 
 	read_ids.clear();
-	vector<int> sizes = get_all_matches_for_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop);
+	vector<int> sizes = get_all_matches_for_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, false);
 
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
 }
@@ -349,7 +345,58 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
     }
 }
 
-bool MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage){
+float MatchUtils::getArmLengthRatio(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::vector<Match> >& all_matches){
+    std::vector<float> avg_len;
+    for (int i = 0; i < arms.size(); ++i)
+    {
+        float tmp = 0.0;
+        for (int j = 0; j < arms[i].size()-1; ++j)
+        {
+            // Need to find the edge between these 2 reads
+            if(arms[i][j] < arms[i][j+1]){
+                // Edge will be on j
+                for(int k = 0; k< all_matches[arms[i][j]].size(); k++){
+                    if((all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1]) ||
+                        (all_matches[arms[i][j]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j]][k].target_read_id == arms[i][j])){
+                        if(j == 0){
+                            if(all_matches[arms[i][j]][k].target_read_id == arms[i][j]){
+                                tmp += all_matches[arms[i][j]][k].target_read_length;
+                            } else {
+                                tmp += all_matches[arms[i][j]][k].query_read_length;
+                            }
+                        }
+                        tmp += all_matches[arms[i][j]][k].length;
+                        break;
+                    }
+                }
+            } else {
+                // Edge will be on j+1
+                for(int k = 0; k< all_matches[arms[i][j+1]].size(); k++){
+                    if((all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1]) ||
+                        (all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j])){
+                        if(j == 0){
+                            if(all_matches[arms[i][j+1]][k].target_read_id == arms[i][j]){
+                                tmp += all_matches[arms[i][j+1]][k].target_read_length;
+                            } else {
+                                tmp += all_matches[arms[i][j+1]][k].query_read_length;
+                            }
+                        }
+                        tmp += all_matches[arms[i][j+1]][k].length;
+                        break;
+                    }
+                }
+            }
+        }
+        avg_len.push_back(tmp);
+    }
+    if(avg_len[0] > avg_len[1]){
+        return avg_len[0]/avg_len[1];
+    } else {
+        return avg_len[1]/avg_len[0];
+    }
+}
+
+float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage){
     // Can see if there is drastic differences in coverage between the two arms, Assuming that short bubbles can be caused by a sequencing error
     // Smaller sequencing errors should have a lower coverage than true variation
     bool valid = true;
@@ -364,6 +411,7 @@ bool MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, st
         }
         avg_cov.push_back(tmp/arms[i].size());
     }
+    float ratio = 0.0;
     for (int i = 0; i < avg_cov.size(); ++i)
     {
         for (int j = 0; j < avg_cov.size(); ++j)
@@ -372,7 +420,6 @@ bool MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, st
             if(i == j) {
                 continue;
             } 
-            float ratio;
             if(avg_cov[i] > avg_cov[j]){
                 ratio = avg_cov[j]/avg_cov[i];
             } else {
@@ -383,7 +430,7 @@ bool MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, st
             }
         }
     }
-    return valid;
+    return ratio;
 }
 
 bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::string>& read_lowest_taxonomy){
@@ -424,7 +471,7 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
     return valid;
 }
 
-bool MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& classification_avg_coverage, std::map<std::string, std::string>& read_full_taxonomy){
+std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& classification_avg_coverage, std::map<std::string, std::string>& read_full_taxonomy){
     // Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
     // And then see if it matches what coverage the arms have
     bool valid = true;
@@ -461,20 +508,13 @@ bool MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms,
     }
     // Now that we have the coverage for each arm, and the average coverage based on the taxonomic classifications of the reads in the arm, we can compare and see if they match what we should be seeing
     // Assumption is that each arm should have similar coverage as the species it comes from. If it does we call it a bubble
+    std::vector<float> ratio_cov;
     for (int i = 0; i < avg_cov.size(); ++i)
     {
         // Compare the average coverages between the arm itself and the species
-        float ratio;
-        if(avg_cov[i] > arm_tax_cov[i]){
-            ratio = arm_tax_cov[i]/avg_cov[i];
-        } else {
-            ratio = avg_cov[i]/arm_tax_cov[i];
-        }
-        if(ratio < 0.75){
-            valid = false;
-        }
+        ratio_cov.push_back(avg_cov[i]/arm_tax_cov[i]);
     }
-    return valid;
+    return ratio_cov;
 }
 
 std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids){
