@@ -121,6 +121,8 @@ int main(int argc, char** argv)
         // Myers Transitive Reduction Alg
         cerr << "Reducing Edges" << endl;
         MatchUtils::reduce_edges(all_matches, read_ids, edge_lists, fuzz);
+        read_indegree.clear();
+        read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
         
         //Clean up all_matches and then the edge_lists
@@ -137,7 +139,7 @@ int main(int argc, char** argv)
             MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
             // Prune Dead End Reads
             MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
-            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
+            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, 2);
             MatchUtils::clean_matches(all_matches);
         }
         cerr << "\tRemoved " << rm_edge << " Edges" << endl;
@@ -202,7 +204,9 @@ int main(int argc, char** argv)
             {
                 result.push_back(level);
             }
-            read_names[id] = read_names[id] + " : " + result[result.size() - 1];
+            if(result.size() > 1){
+                read_names[id] = read_names[id] + " : " + result[result.size() - 1];
+            }
             read_full_taxonomy.insert(make_pair(id, classification));
             read_lowest_taxonomy.insert(make_pair(id, result[result.size() - 1]));
             if(classification_count.count(classification) == 0){
@@ -370,7 +374,22 @@ int main(int argc, char** argv)
         }
     }
     bubbleOutput.close();
-    
+
+    cerr << "Final Clean up" << endl;
+    int rm_edge = 0;
+    for (int i = 0; i < iterations; ++i)
+    {
+        set<string> de_ids;
+        map<string, vector<string> > de_paths;
+        read_indegree.clear();
+        read_outdegree.clear();
+        MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+        // Prune Dead End Reads
+        MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
+        rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, 2);
+        MatchUtils::clean_matches(all_matches);
+    }
+    cerr << "\tRemoved " << rm_edge << " Edges" << endl;
     cerr << "Output GFA: "<< outputFileName << ".gfa" << endl;
     read_indegree.clear();
     read_outdegree.clear();

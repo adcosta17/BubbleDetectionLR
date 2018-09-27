@@ -316,8 +316,63 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
     	//std::cout << "Not enough arms" << std::endl;
         return;
     }
-    for (int i = 1; i < arms.size(); ++i)
+    // Want to remove the smaller arms
+    // Compute the size of each arm first, and keep the longest one
+    int arm_to_keep = 0;
+    std::vector<int> avg_len;
+    for (int i = 0; i < arms.size(); ++i)
     {
+        int tmp = 0;
+        for (int j = 0; j < arms[i].size()-1; ++j)
+        {
+            // Need to find the edge between these 2 reads
+            if(arms[i][j] < arms[i][j+1]){
+                // Edge will be on j
+                for(int k = 0; k< all_matches[arms[i][j]].size(); k++){
+                    if((all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1]) ||
+                        (all_matches[arms[i][j]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j]][k].target_read_id == arms[i][j])){
+                        if(j == 0){
+                            if(all_matches[arms[i][j]][k].target_read_id == arms[i][j]){
+                                tmp += all_matches[arms[i][j]][k].target_read_length;
+                            } else {
+                                tmp += all_matches[arms[i][j]][k].query_read_length;
+                            }
+                        }
+                        tmp += all_matches[arms[i][j]][k].length;
+                        break;
+                    }
+                }
+            } else {
+                // Edge will be on j+1
+                for(int k = 0; k< all_matches[arms[i][j+1]].size(); k++){
+                    if((all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1]) ||
+                        (all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j])){
+                        if(j == 0){
+                            if(all_matches[arms[i][j+1]][k].target_read_id == arms[i][j]){
+                                tmp += all_matches[arms[i][j+1]][k].target_read_length;
+                            } else {
+                                tmp += all_matches[arms[i][j+1]][k].query_read_length;
+                            }
+                        }
+                        tmp += all_matches[arms[i][j+1]][k].length;
+                        break;
+                    }
+                }
+            }
+        }
+        avg_len.push_back(tmp);
+    }
+    for (int i = 0; i < avg_len.size(); ++i)
+    {
+        if(avg_len[i] > avg_len[arm_to_keep]){
+            arm_to_keep = i;
+        }
+    }
+    for (int i = 0; i < arms.size(); ++i)
+    {
+        if(i == arm_to_keep){
+            continue;
+        }
         //Remove this arm
         for (int j = 0; j < arms[i].size()-1; ++j)
         {
@@ -892,6 +947,24 @@ void MatchUtils::compute_in_out_degree(std::map<std::string, std::vector<Match> 
             }
         }
     }
+    /*
+    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        if(*it == "48296" || *it == "41530" || *it == "14852" || *it == "40532"){
+            std::cout << *it << " Read indegree: "<< read_indegree[*it].size() << " ";
+            for (int i = 0; i < read_indegree[*it].size(); ++i)
+            {
+                std::cout << read_indegree[*it][i] << " ";
+            }
+            std::cout << " Read outdegree: " << read_outdegree[*it].size() << " ";
+            for (int i = 0; i < read_outdegree[*it].size(); ++i)
+            {
+                std::cout << read_outdegree[*it][i] << " ";
+            }
+            std::cout << std::endl;
+        }
+    }
+    */
 }
 
 void get_path_to_branch(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& path, std::string id, std::string prev, std::map<std::string, std::vector<std::string> >& read_indegree, std::map<std::string, std::vector<std::string> >& read_outdegree){
@@ -964,11 +1037,13 @@ void MatchUtils::compute_dead_ends(std::map<std::string, std::vector<Match> >& a
         if(read_indegree[*it].size() == 0 && read_outdegree[*it].size() == 0)
         {
             // Read isn't connected to anything, so It cant be a dead end
+            //std::cout<< "Size 0 " << *it << std::endl;
             continue;
         } else if(read_indegree[*it].size() == 0 || read_outdegree[*it].size() == 0) 
         {
             //Read must be a dead end, either on in our out direction
             de_ids.insert(*it);
+            //std::cout<< "DE " << *it << std::endl;
         }
     }
 
@@ -1020,9 +1095,9 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
     // If there is only one path back to the branch, see how long the path is, if it is short(ie caused by seqencing error ) If sum of suffixes in path is less than 2x mean read length, remove it
     for (std::map<std::string, std::vector<std::string> >::iterator it=de_paths.begin(); it!=de_paths.end(); ++it)
     {
+        //std::cout << it->first << std::endl;
         if(it->second.size() == 1){
             // Branch is a dead end, look at all the neighbors is has, if any of them are dead ends too, remove the edge
-            //std::cout << it->first << std::endl;
             for (int i = 0; i < read_indegree[it->first].size(); ++i)
             {
                 // for each branch check to see if its neighbors are also dead ends 

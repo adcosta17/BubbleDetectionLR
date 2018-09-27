@@ -99,7 +99,9 @@ int main(int argc, char** argv)
       	output_handles.insert(make_pair(*it, outputFileName + "_" + *it +".fasta.gz"));
     }
 
-    string id, seq, plus, qual;
+    string id, seq;
+    map<string, string> read_seq;
+    map<string, string> read_levels;
 	while (getline(in_filter, line, '\n'))
 	{
 		if(count == 0){
@@ -113,11 +115,9 @@ int main(int argc, char** argv)
 			count++;
 			continue;
 		} else if(count == 2){
-			plus = line;
 			count++;
 			continue;
 		} else if(count == 3){
-			qual = line;
 			count = 0;
 			seen++;
 		}
@@ -129,33 +129,34 @@ int main(int argc, char** argv)
 		if(read_classification.count(id.substr(1)) == 0){
 			continue;
 		}
+        read_seq.insert(make_pair(id.substr(1), seq));
 		string level = read_classification.at(id.substr(1)).getClassificationForFileName(group_level);
-		if(level != ""){
-			// Classifeid up to the group level
-			// Can write to the exact handle
-			gzFile tmp_file = gzopen(output_handles[level].c_str(),"ab");
-			string val = ">" + id.substr(1)+"\n";
-			gzprintf(tmp_file,val.c_str());
-			val = seq+"\n";
-			gzprintf(tmp_file,val.c_str());
-			gzclose_w(tmp_file);
-
-		} else{
-			// Need to check which classifications our read should be counted against
-			for (map<string, string>::iterator it = output_handles.begin(); it != output_handles.end(); ++it)
-    		{
-				if(read_classification.at(id.substr(1)).parentLevel(it->first)){
-					// Read is a possibly at this classification so write it to file
-					gzFile tmp_file = gzopen(it->second.c_str(),"ab");
-					string val = ">" + id.substr(1)+"\n";
-					gzprintf(tmp_file,val.c_str());
-					val = seq+"\n";
-					gzprintf(tmp_file,val.c_str());
-					gzclose_w(tmp_file);
-				}
-			}
-		}
-	}
+        read_levels.insert(make_pair(id.substr(1), level));
+    }
+    cerr << "Outputting Reads" << endl;
+    map<string, set<string>> read_groups;
+    for(map<string, string>::iterator it = output_handles.begin(); it != output_handles.end(); ++it)
+    {   
+        set<string> tmp;
+        read_groups.insert(make_pair(it->first, tmp));
+        cerr << it->first << endl;
+        for(map<string, string>::iterator it2 = read_levels.begin(); it2 != read_levels.end(); ++it2){
+            if(it2->second == it->first || (it2->second == "" && read_classification.at(it2->first).parentLevel(it->first))){
+                read_groups[it->first].insert(it2->first);    
+            }
+        }
+    }
+    for(map<string, string>::iterator it = output_handles.begin(); it != output_handles.end(); ++it)
+    {   
+        gzFile tmp_file = gzopen(it->second.c_str(),"ab");
+        for(set<string>::iterator it2 = read_groups[it->first].begin(); it2 != read_groups[it->first].end(); ++it2){
+            string val = ">" + *it2 +"\n";
+            gzprintf(tmp_file,val.c_str());
+            val = read_seq[*it2]+"\n";
+            gzprintf(tmp_file,val.c_str());
+        }
+        gzclose_w(tmp_file);
+    }
 
 	cerr << "Completing Output" << endl;
 	ofstream tmp;
