@@ -539,6 +539,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
         for (int j = 0; j < arms[i].size(); ++j)
         {
             tmp += read_coverage[arms[i][j]];
+            //std::cout << arms[i][j] << " " << read_coverage[arms[i][j]] << std::endl;
         }
         avg_cov.push_back(tmp/arms[i].size());
     }
@@ -568,6 +569,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     {
         // Compare the average coverages between the arm itself and the species
         ratio_cov.push_back(avg_cov[i]/arm_tax_cov[i]);
+        //std::cout << avg_cov[i] << " " << arm_tax_cov[i] << std::endl;
     }
     return ratio_cov;
 }
@@ -1693,14 +1695,14 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
     std::cerr << "\tReduced " << count << " edges" << std::endl;
 }
 
-void MatchUtils::toGfa(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, std::vector<std::string> >& read_indegree, std::map<std::string, std::vector<std::string> >& read_outdegree, std::map<std::string, std::string>& read_names, std::map<std::string, std::string>& colours)
+void MatchUtils::toGfa(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, std::vector<std::string> >& read_indegree, std::map<std::string, std::vector<std::string> >& read_outdegree, std::map<std::string, std::string>& read_names, std::map<std::string, std::string>& colours, std::map<std::string, float>& read_coverage)
 {
 	std::ofstream gfaOutput;
   	gfaOutput.open(file_name);
   	gfaOutput << "H\tVN:Z:Test\n";
   	for (std::map<std::string, int>::iterator it=read_lengths.begin(); it!=read_lengths.end(); ++it){
         if(read_outdegree[it->first].size() > 0 || read_indegree[it->first].size() > 0){
-  		    gfaOutput << "S\t" << read_names[it->first] <<"\t*\tLN:i:" << it->second << "\tCL:z:" << colours[it->first] << "\tC2:z:" << colours[it->first] << "\n";
+  		    gfaOutput << "S\t" << read_names[it->first] <<"\t*\tLN:i:" << it->second << "\tKC:i:"<< static_cast<int>(it->second*read_coverage[it->first]) << "\tCL:z:" << colours[it->first] << "\tC2:z:" << colours[it->first] << "\n";
         }
   	}
   	for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it){

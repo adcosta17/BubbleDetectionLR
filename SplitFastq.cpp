@@ -108,6 +108,7 @@ int main(int argc, char** argv)
 			istringstream lin(line);
 			// Only want the read ID, not anything else in the header
 			lin >> id;
+            //cerr << id << endl;
 			count++;
 			continue;
 		} else if(count == 1){
@@ -139,12 +140,15 @@ int main(int argc, char** argv)
     {   
         set<string> tmp;
         read_groups.insert(make_pair(it->first, tmp));
-        cerr << it->first << endl;
+        cerr << it->first;
+        count = 0;
         for(map<string, string>::iterator it2 = read_levels.begin(); it2 != read_levels.end(); ++it2){
             if(it2->second == it->first || (it2->second == "" && read_classification.at(it2->first).parentLevel(it->first))){
-                read_groups[it->first].insert(it2->first);    
+                read_groups[it->first].insert(it2->first);
+                count ++;
             }
         }
+        cerr << " " << count << endl;
     }
     for(map<string, string>::iterator it = output_handles.begin(); it != output_handles.end(); ++it)
     {   

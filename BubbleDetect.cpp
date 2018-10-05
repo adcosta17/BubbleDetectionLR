@@ -78,6 +78,7 @@ int main(int argc, char** argv)
     map<string, float> read_coverage;
 
     if(chimeric){
+        cerr << "Reading in Chimeric Read List" << endl;
         ifstream inputFileChimeric(chimeric_read_file);
         string line;
         while (getline(inputFileChimeric, line))
@@ -88,13 +89,15 @@ int main(int argc, char** argv)
             if(classification == "Chimeric"){
                 chimeric_reads.insert(id);
             }
+            //cout << id << endl;
         }
     }
 
     if(coverage){
+        cerr << "Reading in Read Coverage List" << endl;
         ifstream inputFileCoverage(coverage_file);
         string line;
-        while (getline(inputFileCoverage, line))
+        while (getline(inputFileCoverage, line, '\n'))
         {
             istringstream lin(line);
             string id;
@@ -102,6 +105,7 @@ int main(int argc, char** argv)
             float cov;
             lin >> id >> len >> cov;
             read_coverage.insert(make_pair(id, cov));
+            //cout << read_coverage[id] << endl;
         }
     }
 
@@ -292,6 +296,7 @@ int main(int argc, char** argv)
         }
     }
     seen_bubbles.clear();
+    set<pair<string, string> > collapsed_bubbles;
     if(tax){
         for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
         {
@@ -299,7 +304,7 @@ int main(int argc, char** argv)
             // Idea is that bubbles between regions that are all from the same species or subspecies, with no ambiguity should be popped
             // Ambiguity can occur if each arm of bubble has multiple reads classified to same level but differing classifcation
             // ie. arm 1 is sub-species A and arm2 is sub-species B. Can't choose between them Vs Arm1 is subspecies A and arm2 is just the main species
-            if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
+            if(collapsed_bubbles.count(it->first) == 0 && collapsed_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
                 vector<vector<string> > arms;
                 MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
                 bool tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
@@ -308,8 +313,9 @@ int main(int argc, char** argv)
                     // This bubble is a true bubble but all the reads can be from the same species or subspecies
                     // So we can collapse it
                     MatchUtils::collapseBubble(arms, all_matches);
+                    seen_bubbles.insert(it->first);
                 }
-                seen_bubbles.insert(it->first);
+                collapsed_bubbles.insert(it->first);
             }
         }
     }
@@ -368,6 +374,8 @@ int main(int argc, char** argv)
             }
             bubbleOutput << "\t";
             bubbleOutput << cov_only;
+            bubbleOutput << "\t";
+            bubbleOutput << arm_ratio;
             bubbleOutput << endl;
             
             seen_bubbles.insert(it->first);
@@ -394,7 +402,7 @@ int main(int argc, char** argv)
     read_indegree.clear();
     read_outdegree.clear();
     MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-    MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours);
+    MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours, read_coverage);
 
     for (int k = 0; k < n50_values.size(); k++)
     {
