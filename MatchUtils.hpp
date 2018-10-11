@@ -27,4 +27,5 @@ class MatchUtils
 	static float validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage);
 	static void collapseBubble(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::vector<Match> >& all_matches);
 	static float getArmLengthRatio(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::vector<Match> >& all_matches);
+	static void remove_edge(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::string start, std::string end);
 };

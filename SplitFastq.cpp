@@ -24,9 +24,10 @@ int main(int argc, char** argv)
 {
 	bool exit = false;
     int opt;
+    int min_reads = 1000;
     char group_level = 's';
     string fastqFile, outputFileName, taxonomy_file,line;
-    while ((opt = getopt(argc,argv,"i:o:m:x:")) != EOF)
+    while ((opt = getopt(argc,argv,"i:o:m:x:r:")) != EOF)
     {
         switch(opt)
         {
@@ -34,6 +35,7 @@ int main(int argc, char** argv)
             case 'o': outputFileName = optarg; break;
             case 'm': taxonomy_file = optarg; break;
             case 'x': group_level = optarg[0]; break;
+            case 'r': min_reads = atoi(optarg); break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -49,7 +51,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "\nUsage: SplitFastq\n -i InputFastq\n -o Output Path and Prefix\n -m mpa taxonomy file\n (optional) -x group_level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n\n";
+        cerr << "\nUsage: SplitFastq\n -i InputFastq\n -o Output Path and Prefix\n -m mpa taxonomy file\n -r (optional) minimum number of reads needed for species to be considered [1000]\n (optional) -x group_level [s: species (default), g: genus, f: family, o: order, c: class, p: phylum, d: domain]\n\n";
         return 0;
     }
 
@@ -57,6 +59,7 @@ int main(int argc, char** argv)
     ifstream inputFile_mpa(taxonomy_file);
     map<string, Read> read_classification;
     set<string> classification_set;
+    map<string, int> classification_count;
     while (getline(inputFile_mpa, line))
     {   
         istringstream lin(line);
@@ -78,6 +81,10 @@ int main(int argc, char** argv)
         }
         if(tmp != ""){
         	classification_set.insert(tmp);
+            if(classification_count.count(tmp) == 0){
+                classification_count.insert(make_pair(tmp, 0));
+            }
+            classification_count[tmp]++;
         }
     }
 
@@ -96,7 +103,9 @@ int main(int argc, char** argv)
     // Create a handle for each classificaion in classification_set
     for (set<string>::iterator it = classification_set.begin(); it != classification_set.end(); ++it)
     {
-      	output_handles.insert(make_pair(*it, outputFileName + "_" + *it +".fasta.gz"));
+        if(classification_count[*it] >= min_reads){
+            output_handles.insert(make_pair(*it, outputFileName + "_" + *it +".fasta.gz"));
+        }
     }
 
     string id, seq;
@@ -140,7 +149,6 @@ int main(int argc, char** argv)
     {   
         set<string> tmp;
         read_groups.insert(make_pair(it->first, tmp));
-        cerr << it->first;
         count = 0;
         for(map<string, string>::iterator it2 = read_levels.begin(); it2 != read_levels.end(); ++it2){
             if(it2->second == it->first || (it2->second == "" && read_classification.at(it2->first).parentLevel(it->first))){
@@ -148,18 +156,20 @@ int main(int argc, char** argv)
                 count ++;
             }
         }
-        cerr << " " << count << endl;
+        cerr << it->first << " " << count << endl;
     }
     for(map<string, string>::iterator it = output_handles.begin(); it != output_handles.end(); ++it)
     {   
-        gzFile tmp_file = gzopen(it->second.c_str(),"ab");
-        for(set<string>::iterator it2 = read_groups[it->first].begin(); it2 != read_groups[it->first].end(); ++it2){
-            string val = ">" + *it2 +"\n";
-            gzprintf(tmp_file,val.c_str());
-            val = read_seq[*it2]+"\n";
-            gzprintf(tmp_file,val.c_str());
+        if(read_groups[it->first].size() > 0){
+            gzFile tmp_file = gzopen(it->second.c_str(),"ab");
+            for(set<string>::iterator it2 = read_groups[it->first].begin(); it2 != read_groups[it->first].end(); ++it2){
+                string val = ">" + *it2 +"\n";
+                gzprintf(tmp_file,val.c_str());
+                val = read_seq[*it2]+"\n";
+                gzprintf(tmp_file,val.c_str());
+            }
+            gzclose_w(tmp_file);
         }
-        gzclose_w(tmp_file);
     }
 
 	cerr << "Completing Output" << endl;

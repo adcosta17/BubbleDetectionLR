@@ -679,6 +679,67 @@ void MatchUtils::subset_matches(std::map<std::string, std::vector<Match> >& all_
     }
 }
 
+void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::string start, std::string end){
+    // First remove from all_matches
+    if(start < end){
+        for(int i =0; i < all_matches[start].size(); i++){
+            if(all_matches[start][i].query_read_id == start && all_matches[start][i].target_read_id == end){
+                all_matches[start][i].reduce = true;
+                break;
+            } else if(all_matches[start][i].query_read_id == end && all_matches[start][i].target_read_id == start){
+                all_matches[start][i].reduce = true;
+                break;
+            }
+        }
+    } else {
+        for(int i =0; i < all_matches[end].size(); i++){
+            if(all_matches[end][i].query_read_id == start && all_matches[end][i].target_read_id == end){
+                all_matches[end][i].reduce = true;
+                break;
+            } else if(all_matches[end][i].query_read_id == end && all_matches[end][i].target_read_id == start){
+                all_matches[end][i].reduce = true;
+                break;
+            }
+        }
+    }
+
+    // Remove edge from read_indegree and out_degree
+    if(std::find(read_indegree[start].begin(), read_indegree[start].end(), end) != read_indegree[start].end()){
+        std::vector<std::string> tmp;
+        for(int i = 0; i < read_indegree[start].size(); i++){
+            if(read_indegree[start][i] != end){
+                tmp.push_back(read_indegree[start][i]);
+            }
+        }
+        read_indegree[start] = tmp;
+    } else if(std::find(read_outdegree[start].begin(), read_outdegree[start].end(), end) != read_outdegree[start].end()){
+        std::vector<std::string> tmp;
+        for(int i = 0; i < read_outdegree[start].size(); i++){
+            if(read_outdegree[start][i] != end){
+                tmp.push_back(read_outdegree[start][i]);
+            }
+        }
+        read_outdegree[start] = tmp;
+    }
+    if(std::find(read_indegree[end].begin(), read_indegree[end].end(), start) != read_indegree[end].end()){
+        std::vector<std::string> tmp;
+        for(int i = 0; i < read_indegree[end].size(); i++){
+            if(read_indegree[end][i] != start){
+                tmp.push_back(read_indegree[end][i]);
+            }
+        }
+        read_indegree[end] = tmp;
+    } else if(std::find(read_outdegree[end].begin(), read_outdegree[end].end(), start) != read_outdegree[end].end()){
+        std::vector<std::string> tmp;
+        for(int i = 0; i < read_outdegree[end].size(); i++){
+            if(read_outdegree[end][i] != start){
+                tmp.push_back(read_outdegree[end][i]);
+            }
+        }
+        read_outdegree[end] = tmp;
+    }
+}
+
 
 void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::map<std::pair<std::string,std::string>, std::set<std::string> >& bubble_sets, std::vector<std::string>& start_ids){
 
@@ -687,9 +748,9 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
     std::pair<std::string,std::string> end = std::make_pair("","");
     visited.insert(start);
     bool print = false;
-    //if(start == "60275"){
-    //    print = true;
-    //}
+    if(start == "4965"){
+        print = true;
+    }
     for (int i = 0; i < start_ids.size(); ++i)
     {   
         visited.insert(start_ids[i]);
@@ -780,9 +841,17 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                         q.push_back(std::make_pair(read_outdegree[e.first][i], e.first));
                     } else {
                         // Found a node we have already seen, possible bubble
-                        bubble_end = read_outdegree[e.first][i];
-                        q.clear();
-                        break;
+                        if(visited_back.count(start) > 0){
+                            bubble_end = read_outdegree[e.first][i];
+                            if(print){
+                                std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
+                            }
+                            std::set<std::string> combined;
+                            std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
+                            bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
+                            q.clear();
+                            break;
+                        }
                     }
                 }
             } else {
@@ -793,16 +862,21 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                         q.push_back(std::make_pair(read_indegree[e.first][i], e.first));
                     } else {
                         // Found a node we have already seen, possible bubble
-                        bubble_end = read_indegree[e.first][i];
-                        q.clear();
-                        break;
+                        if(visited_back.count(start) > 0){
+                            bubble_end = read_indegree[e.first][i];
+                            if(print){
+                                std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
+                            }
+                            std::set<std::string> combined;
+                            std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
+                            bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
+                            q.clear();
+                            break;
+                        }
                     }
                 }
             }
         }
-        std::set<std::string> combined;
-        std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
-        bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
     } 
 }
 
