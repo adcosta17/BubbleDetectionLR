@@ -323,97 +323,25 @@ int main(int argc, char** argv)
         }
     }
 
-    for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
-    {    
-       // First check if Bubble is fully contained by a larger bubble
-       // If so mark it as seen and remove the edges of it appropraitely based on the in/out degree and start and end postions
-        for (map<pair<string,string>, set<string> >::iterator it2=bubble_sets.begin(); it2!=bubble_sets.end(); ++it2)
-        { 
-            if(it->first == it2->first || std::make_pair((it->first).second, (it->first).first) == it2->first){
-                //same bubble
-                continue;
-            }
-            // Now check to see which set is larger
-            if(it->second.size() < it2->second.size()){
-                set<string> intersect;
-                set_intersection(it->second.begin(),it->second.end(),it2->second.begin(),it2->second.end(),inserter(intersect,intersect.begin()));
-                if(intersect.size() == it->second.size()){
-                    // All nodes are contained in this larger bubble
-                    // Should now evaluate each node and its edges to see if they should be kept or removed 
-                    for(set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
-                        // First check to see if read is at the start or end of the bigger bubble, if so then don't do anything to it
-                        if(*it3 == (it2->first).first || *it3 == (it2->first).second){
-                            continue;
-                        }
-                        // If the read is cleanly part of the bubble then leave it
-                        // It Could cleanly be part of the larger bubble as well
-                        if(read_outdegree[*it3].size() == 1 && read_indegree[*it3].size() == 1){
-                            continue;
-                        }
-                        // Now read must either be a dead end, which we won't touch in this case
-                        // OR the read must have either 2 reads in or 2 out. 
-                        // Only Modify the edges if the other read in the pair is also in the bubble
-                        if(read_indegree[*it3].size() >= 2 && read_outdegree[*it3].size() != 0){
-                            for(int i = 0; i < read_indegree[*it3].size(); i++){
-                                string read_target = read_indegree[*it3][i];
-                                // Skip read if it is outside the big bubble
-                                if(it2->second.count(read_target) == 0 || read_target == (it2->first).first || read_target == (it2->first).second){
-                                    continue;
-                                }
-                                // Dont look at read_target's full indegree, only bubble specific
-                                int rt_in = 0;
-                                int rt_out = 0;
-                                for(int j = 0; j < read_indegree[read_target].size(); j++){
-                                    rt_in += it2->second.count(read_indegree[read_target][j]);
-                                }
-                                for(int j = 0; j < read_outdegree[read_target].size(); j++){
-                                    rt_out += it2->second.count(read_outdegree[read_target][j]);
-                                }
-                                // If this read has multiple edges in and one of those edges is our current node
-                                if(rt_in > 1 && std::find(read_indegree[read_target].begin(), read_indegree[read_target].end(), *it3) != read_indegree[read_target].end()){
-                                    // Remove this edge
-                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
-                                }
-                                else if(rt_out > 1 && std::find(read_outdegree[read_target].begin(), read_outdegree[read_target].end(), *it3) != read_outdegree[read_target].end()){
-                                    // Remove this edge
-                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
-                                }
-                            }
-                        }
-                        if(read_indegree[*it3].size() != 0 && read_outdegree[*it3].size() >= 2){
-                            for(int i = 0; i < read_outdegree[*it3].size(); i++){
-                                string read_target = read_outdegree[*it3][i];
-                                // Skip read if it is outside the big bubble
-                                if(it2->second.count(read_target) == 0 || read_target == (it2->first).first || read_target == (it2->first).second){
-                                    continue;
-                                }
-                                // Dont look at read_target's full indegree, only bubble specific
-                                int rt_in = 0;
-                                int rt_out = 0;
-                                for(int j = 0; j < read_indegree[read_target].size(); j++){
-                                    rt_in += it2->second.count(read_indegree[read_target][j]);
-                                }
-                                for(int j = 0; j < read_outdegree[read_target].size(); j++){
-                                    rt_out += it2->second.count(read_outdegree[read_target][j]);
-                                }
-                                // If this read has multiple edges in and one of those edges is our current node
-                                if(rt_in > 1 && std::find(read_indegree[read_target].begin(), read_indegree[read_target].end(), *it3) != read_indegree[read_target].end()){
-                                    // Remove this edge
-                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
-                                }
-                                else if(rt_out > 1 && std::find(read_outdegree[read_target].begin(), read_outdegree[read_target].end(), *it3) != read_outdegree[read_target].end()){
-                                    // Remove this edge
-                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
-                                }
-                            }
-                        }
-                    }
-                    seen_bubbles.insert(it->first);
-                } 
-            }
-        }
-
-    }
+    // Now that simple bubbles are collapsed, remove internal bubbles
+    // These are small bubbles hiding inside larger ones
+    for(int i = 0; i < iterations; i++){
+	    bubble_sets.clear();
+	    read_indegree.clear();
+	    read_outdegree.clear();
+	    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+	    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+	    {
+	        //Look for nodes that have at least 2 valid neighbours
+	        if(read_indegree[*it].size() >= 2){
+	            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
+	        }
+	        if(read_outdegree[*it].size() >= 2){
+	            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
+	        }
+	    }
+	    MatchUtils::remove_internal_bubbles(bubble_sets, all_matches, read_indegree, read_outdegree);
+	}
 
     // Check to find sets that are unique less the two ends of the pair
     // A true bubble will have reads that only appear in the bubble

@@ -488,6 +488,125 @@ float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, s
     return ratio;
 }
 
+void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::string>, std::set<std::string> >& bubble_sets, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree){
+	using namespace std;
+	set<pair<string, string> > seen_bubbles;
+	for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+    {    
+       // First check if Bubble is fully contained by a larger bubble
+       // If so mark it as seen and remove the edges of it appropraitely based on the in/out degree and start and end postions
+        for (map<pair<string,string>, set<string> >::iterator it2=bubble_sets.begin(); it2!=bubble_sets.end(); ++it2)
+        { 
+            if(it->first == it2->first || std::make_pair((it->first).second, (it->first).first) == it2->first){
+                //same bubble
+                continue;
+            }
+            if(seen_bubbles.count(it->first) != 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) != 0){
+            	continue;
+            }
+            if(seen_bubbles.count(it2->first) != 0 && seen_bubbles.count(std::make_pair((it2->first).second, (it2->first).first)) != 0){
+            	continue;
+            }
+            // Now check to see which set is larger
+            /*
+            if(((it->first).second == "2920" || (it->first).first == "2920") && ((it2->first).second == "563" || (it2->first).first == "563")){
+            	cout << (it->first).second << " " << (it->first).first << " In " << (it2->first).second << " " <<  (it2->first).first;
+            	cout << " " << it->second.size() << " " << it2->second.size() << endl;
+            	for(set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
+            		cout << " " << *it3;
+            	}
+            	cout << endl;
+            	for(set<string>::iterator it3=it2->second.begin(); it3 != it2->second.end(); it3++){
+            		cout << " " << *it3;
+            	}
+            	cout << endl;
+            }
+            */
+            if(it->second.size() < it2->second.size()){
+                set<string> intersect;
+                set_intersection(it->second.begin(),it->second.end(),it2->second.begin(),it2->second.end(),inserter(intersect,intersect.begin()));
+                if(intersect.size() == it->second.size()){
+                	//if((it->first).second == "2920" || (it->first).first == "2920"){
+                	//	cout << (it->first).second << " " << (it->first).first << " In " << (it2->first).second << " " <<  (it2->first).first << endl;
+                	//}
+                    // All nodes are contained in this larger bubble
+                    // Should now evaluate each node and its edges to see if they should be kept or removed 
+                    for(set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
+                        // First check to see if read is at the start or end of the bigger bubble, if so then don't do anything to it
+                        if(*it3 == (it2->first).first || *it3 == (it2->first).second){
+                            continue;
+                        }
+                        // If the read is cleanly part of the bubble then leave it
+                        // It Could cleanly be part of the larger bubble as well
+                        if(read_outdegree[*it3].size() == 1 && read_indegree[*it3].size() == 1){
+                            continue;
+                        }
+                        // Now read must either be a dead end, which we won't touch in this case
+                        // OR the read must have either 2 reads in or 2 out. 
+                        // Only Modify the edges if the other read in the pair is also in the bubble
+                        if(read_indegree[*it3].size() >= 2 && read_outdegree[*it3].size() != 0){
+                            for(int i = 0; i < read_indegree[*it3].size(); i++){
+                                string read_target = read_indegree[*it3][i];
+                                // Skip read if it is outside the big bubble
+                                if(it2->second.count(read_target) == 0 || read_target == (it2->first).first || read_target == (it2->first).second){
+                                    continue;
+                                }
+                                // Dont look at read_target's full indegree, only bubble specific
+                                int rt_in = 0;
+                                int rt_out = 0;
+                                for(int j = 0; j < read_indegree[read_target].size(); j++){
+                                    rt_in += it2->second.count(read_indegree[read_target][j]);
+                                }
+                                for(int j = 0; j < read_outdegree[read_target].size(); j++){
+                                    rt_out += it2->second.count(read_outdegree[read_target][j]);
+                                }
+                                // If this read has multiple edges in and one of those edges is our current node
+                                if(rt_in > 1 && std::find(read_indegree[read_target].begin(), read_indegree[read_target].end(), *it3) != read_indegree[read_target].end()){
+                                    // Remove this edge
+                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
+                                }
+                                else if(rt_out > 1 && std::find(read_outdegree[read_target].begin(), read_outdegree[read_target].end(), *it3) != read_outdegree[read_target].end()){
+                                    // Remove this edge
+                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
+                                }
+                            }
+                        }
+                        if(read_indegree[*it3].size() != 0 && read_outdegree[*it3].size() >= 2){
+                            for(int i = 0; i < read_outdegree[*it3].size(); i++){
+                                string read_target = read_outdegree[*it3][i];
+                                // Skip read if it is outside the big bubble
+                                if(it2->second.count(read_target) == 0 || read_target == (it2->first).first || read_target == (it2->first).second){
+                                    continue;
+                                }
+                                // Dont look at read_target's full indegree, only bubble specific
+                                int rt_in = 0;
+                                int rt_out = 0;
+                                for(int j = 0; j < read_indegree[read_target].size(); j++){
+                                    rt_in += it2->second.count(read_indegree[read_target][j]);
+                                }
+                                for(int j = 0; j < read_outdegree[read_target].size(); j++){
+                                    rt_out += it2->second.count(read_outdegree[read_target][j]);
+                                }
+                                // If this read has multiple edges in and one of those edges is our current node
+                                if(rt_in > 1 && std::find(read_indegree[read_target].begin(), read_indegree[read_target].end(), *it3) != read_indegree[read_target].end()){
+                                    // Remove this edge
+                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
+                                }
+                                else if(rt_out > 1 && std::find(read_outdegree[read_target].begin(), read_outdegree[read_target].end(), *it3) != read_outdegree[read_target].end()){
+                                    // Remove this edge
+                                    MatchUtils::remove_edge(all_matches, read_indegree, read_outdegree, *it3, read_target);
+                                }
+                            }
+                        }
+                    }
+                    seen_bubbles.insert(it->first);
+                    seen_bubbles.insert(it2->first);
+                } 
+            }
+        }
+    }
+}
+
 bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::string>& read_lowest_taxonomy){
     // Can use the taxonomy information to see if the arms have distinct species or subspecies
     // Don't want to have shared lowest level of taxinomic classification between arms
@@ -681,6 +800,7 @@ void MatchUtils::subset_matches(std::map<std::string, std::vector<Match> >& all_
 
 void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::string start, std::string end){
     // First remove from all_matches
+    //std::cout << "collapseBubble between "<< start << " " << end << std::endl;
     if(start < end){
         for(int i =0; i < all_matches[start].size(); i++){
             if(all_matches[start][i].query_read_id == start && all_matches[start][i].target_read_id == end){
@@ -745,12 +865,13 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
 
     std::set<std::string> visited;
     std::list<std::pair<std::string,std::string> > q;
+    std::map<std::pair<std::string,std::string>, std::set<std::string>> bubbles;
     std::pair<std::string,std::string> end = std::make_pair("","");
     visited.insert(start);
     bool print = false;
-    if(start == "4965"){
-        print = true;
-    }
+    //if(start == "1916" || start == "1807"){
+    //    print = true;
+    //}
     for (int i = 0; i < start_ids.size(); ++i)
     {   
         visited.insert(start_ids[i]);
@@ -776,8 +897,12 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                 } else {
                     // Found a node we have already seen, possible bubble
                     end = std::make_pair(read_outdegree[s.first][i],s.first);
-                    q.clear();
-                    break;
+                    if(bubbles.size() < 3){
+                        bubbles.insert(std::make_pair(end, visited));
+                    } else {
+                        q.clear();
+                        break;
+                    }
                 }
             }
         } else {
@@ -789,8 +914,12 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                 } else {
                     // Found a node we have already seen, possible bubble
                     end = std::make_pair(read_indegree[s.first][i],s.first);
-                    q.clear();
-                    break;
+                    if(bubbles.size() < 3){
+                        bubbles.insert(std::make_pair(end, visited));
+                    } else {
+                        q.clear();
+                        break;
+                    }
                 }
             }
         }
@@ -799,85 +928,88 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
     // Once we have a node that we have already seen, backtrack and compute the set of visited nodes via a BFS from node we've already seen to the start node
     // Know that 2 paths exist, as proven in the first half so we should be able to find them.
     // Can take the two visited sets and do a intersection, giving us the set of nodes that is on the path between the two exactly
-
-    if(end.first != ""){
-        if(print){
-            std::cout << "Possible Bubble between: " << start << " and " << end.first << std::endl;
-        }
-        q.clear();
-        std::set<std::string> visited_back;
-        visited_back.insert(end.first);
-        // Need to check on the direction of our end node, see what the predacesor was and if it is in indegreee or outdegree
-        if(std::find(read_indegree[end.first].begin(), read_indegree[end.first].end(), end.second) != read_indegree[end.first].end()){
-            for (int i = 0; i < read_indegree[end.first].size(); ++i)
-            {   
-                visited_back.insert(read_indegree[end.first][i]);
-                q.push_back(std::make_pair(read_indegree[end.first][i], end.first));
-            }
-        } else {
-            for (int i = 0; i < read_outdegree[end.first].size(); ++i)
-            {   
-                visited_back.insert(read_outdegree[end.first][i]);
-                q.push_back(std::make_pair(read_outdegree[end.first][i], end.first));
-            }
-        }
-        std::string bubble_end = start;
-        while(!q.empty())
-        {
-            std::pair<std::string,std::string> e = q.front();
+    for(std::map<std::pair<std::string,std::string>, std::set<std::string>>::iterator it = bubbles.begin(); it != bubbles.end(); it++){
+        visited = it->second;
+        end = it->first;
+        if(end.first != ""){
             if(print){
-                std::cout << "At: " << e.first << " From " << e.second << std::endl;
+                std::cout << "Possible Bubble between: " << start << " and " << end.first << std::endl;
             }
-            q.pop_front();
-            bool check_outdegree = false;
-            if(std::find(read_indegree[e.first].begin(), read_indegree[e.first].end(), e.second) != read_indegree[e.first].end()){
-                check_outdegree = true;
-            }
-            if(check_outdegree){
-                for (int i = 0; i < read_outdegree[e.first].size(); ++i)
-                {
-                    if(visited_back.count(read_outdegree[e.first][i]) == 0){
-                        visited_back.insert(read_outdegree[e.first][i]);
-                        q.push_back(std::make_pair(read_outdegree[e.first][i], e.first));
-                    } else {
-                        // Found a node we have already seen, possible bubble
-                        if(visited_back.count(start) > 0){
-                            bubble_end = read_outdegree[e.first][i];
-                            if(print){
-                                std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
-                            }
-                            std::set<std::string> combined;
-                            std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
-                            bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
-                            q.clear();
-                            break;
-                        }
-                    }
+            q.clear();
+            std::set<std::string> visited_back;
+            visited_back.insert(end.first);
+            // Need to check on the direction of our end node, see what the predacesor was and if it is in indegreee or outdegree
+            if(std::find(read_indegree[end.first].begin(), read_indegree[end.first].end(), end.second) != read_indegree[end.first].end()){
+                for (int i = 0; i < read_indegree[end.first].size(); ++i)
+                {   
+                    visited_back.insert(read_indegree[end.first][i]);
+                    q.push_back(std::make_pair(read_indegree[end.first][i], end.first));
                 }
             } else {
-                for (int i = 0; i < read_indegree[e.first].size(); ++i)
-                {
-                    if(visited_back.count(read_indegree[e.first][i]) == 0){
-                        visited_back.insert(read_indegree[e.first][i]);
-                        q.push_back(std::make_pair(read_indegree[e.first][i], e.first));
-                    } else {
-                        // Found a node we have already seen, possible bubble
-                        if(visited_back.count(start) > 0){
-                            bubble_end = read_indegree[e.first][i];
-                            if(print){
-                                std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
+                for (int i = 0; i < read_outdegree[end.first].size(); ++i)
+                {   
+                    visited_back.insert(read_outdegree[end.first][i]);
+                    q.push_back(std::make_pair(read_outdegree[end.first][i], end.first));
+                }
+            }
+            std::string bubble_end = start;
+            while(!q.empty())
+            {
+                std::pair<std::string,std::string> e = q.front();
+                if(print){
+                    std::cout << "At: " << e.first << " From " << e.second << std::endl;
+                }
+                q.pop_front();
+                bool check_outdegree = false;
+                if(std::find(read_indegree[e.first].begin(), read_indegree[e.first].end(), e.second) != read_indegree[e.first].end()){
+                    check_outdegree = true;
+                }
+                if(check_outdegree){
+                    for (int i = 0; i < read_outdegree[e.first].size(); ++i)
+                    {
+                        if(visited_back.count(read_outdegree[e.first][i]) == 0){
+                            visited_back.insert(read_outdegree[e.first][i]);
+                            q.push_back(std::make_pair(read_outdegree[e.first][i], e.first));
+                        } else {
+                            // Found a node we have already seen, possible bubble
+                            if(visited_back.count(start) > 0){
+                                bubble_end = read_outdegree[e.first][i];
+                                if(print){
+                                    std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
+                                }
+                                std::set<std::string> combined;
+                                std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
+                                bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
+                                q.clear();
+                                break;
                             }
-                            std::set<std::string> combined;
-                            std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
-                            bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
-                            q.clear();
-                            break;
+                        }
+                    }
+                } else {
+                    for (int i = 0; i < read_indegree[e.first].size(); ++i)
+                    {
+                        if(visited_back.count(read_indegree[e.first][i]) == 0){
+                            visited_back.insert(read_indegree[e.first][i]);
+                            q.push_back(std::make_pair(read_indegree[e.first][i], e.first));
+                        } else {
+                            // Found a node we have already seen, possible bubble
+                            if(visited_back.count(start) > 0){
+                                bubble_end = read_indegree[e.first][i];
+                                if(print){
+                                    std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
+                                }
+                                std::set<std::string> combined;
+                                std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
+                                bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
+                                q.clear();
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
-    } 
+    }
 }
 
 void recurse_bubble_arm(std::string id, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::string>& tmp){
