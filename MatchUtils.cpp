@@ -897,7 +897,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                 } else {
                     // Found a node we have already seen, possible bubble
                     end = std::make_pair(read_outdegree[s.first][i],s.first);
-                    if(bubbles.size() < 3){
+                    if(bubbles.size() < 2){
                         bubbles.insert(std::make_pair(end, visited));
                     } else {
                         q.clear();
@@ -914,7 +914,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                 } else {
                     // Found a node we have already seen, possible bubble
                     end = std::make_pair(read_indegree[s.first][i],s.first);
-                    if(bubbles.size() < 3){
+                    if(bubbles.size() < 2){
                         bubbles.insert(std::make_pair(end, visited));
                     } else {
                         q.clear();
