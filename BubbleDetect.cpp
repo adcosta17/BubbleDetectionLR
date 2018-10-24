@@ -382,21 +382,23 @@ int main(int argc, char** argv)
         if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
             
             // Score Bubbles based on values seen
-            //Linear:   0.004047     0.012653     0.452049     0.016768     0.068084  -0.616781     0.058613
-            //Logistic: 0.02297      0.03667      3.11104     -0.06563      0.29392   -4.52549      0.40195
-            float score = 0.02297*it->second.size();
+            //Linear:   
+            float weights[7] = {0.004047, 0.012653, 0.452049, 0.016768, 0.068084, -0.616781, 0.058613};
+            //Logistic:
+            //int weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
+            float score = weights[0]*it->second.size();
             if(true_bubble){
-                score += 0.03667;
+                score += weights[1];
             }
             if(tax_and_cov.size() == 2){
-               score += tax_and_cov[0]*3.11104;
-               score += tax_and_cov[1]*-0.06563;
+               score += tax_and_cov[0]*weights[2];
+               score += tax_and_cov[1]*weights[3];
             }
             if(tax_only){
-                score += 0.29392;
+                score += weights[4];
             }
-            score += cov_only*-4.52549;
-            score += arm_ratio*0.40195;
+            score += cov_only*weights[5];
+            score += arm_ratio*weights[6];
 
             bubbleOutput << score << "\t";
             bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t" << it->second.size() << "\t";
