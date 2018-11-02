@@ -451,7 +451,7 @@ float MatchUtils::getArmLengthRatio(std::vector<std::vector<std::string> >& arms
     }
 }
 
-float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage){
+float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, int>& read_lengths){
     // Can see if there is drastic differences in coverage between the two arms, Assuming that short bubbles can be caused by a sequencing error
     // Smaller sequencing errors should have a lower coverage than true variation
     bool valid = true;
@@ -460,11 +460,13 @@ float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, s
     for (int i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
+        int arm_size = 0;
         for (int j = 0; j < arms[i].size(); ++j)
         {
-            tmp += read_coverage[arms[i][j]];
+            tmp += (read_coverage[arms[i][j]] * read_lengths[arms[i][j]]);
+            arm_size += read_lengths[arms[i][j]];
         }
-        avg_cov.push_back(tmp/arms[i].size());
+        avg_cov.push_back(tmp/arm_size);
     }
     float ratio = 0.0;
     for (int i = 0; i < avg_cov.size(); ++i)
@@ -645,7 +647,7 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
     return valid;
 }
 
-std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& classification_avg_coverage, std::map<std::string, std::string>& read_full_taxonomy){
+std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& classification_avg_coverage, std::map<std::string, std::string>& read_full_taxonomy, std::map<std::string, int>& read_lengths){
     // Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
     // And then see if it matches what coverage the arms have
     bool valid = true;
@@ -655,12 +657,14 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     for (int i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
+        int arm_size = 0;
         for (int j = 0; j < arms[i].size(); ++j)
         {
-            tmp += read_coverage[arms[i][j]];
+            tmp += (read_coverage[arms[i][j]] * read_lengths[arms[i][j]]);
+            arm_size += read_lengths[arms[i][j]];
             //std::cout << arms[i][j] << " " << read_coverage[arms[i][j]] << std::endl;
         }
-        avg_cov.push_back(tmp/arms[i].size());
+        avg_cov.push_back(tmp/arm_size);
     }
     // Now need to compute the average coverage for each species/supspecies found in the arm
     // First get the species/subspecies in each arm using read_full_taxonomy
@@ -669,6 +673,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     for (int i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
+        int arm_size = 0;
         for (int j = 0; j < arms[i].size(); ++j)
         {
             if(j == 0 || j == arms[i].size()){
@@ -677,9 +682,10 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
             }
             // Otherwise get the edge lengths of each overlap, and then weight each read's coverage. Each read should have a classification. 
             // If it doesn't then use the read coverage
-            tmp += classification_avg_coverage[read_full_taxonomy[arms[i][j]]];
+            tmp += (classification_avg_coverage[read_full_taxonomy[arms[i][j]]] * read_lengths[arms[i][j]]);
+            arm_size += read_lengths[arms[i][j]];
         }
-        arm_tax_cov.push_back(tmp/arms[i].size());
+        arm_tax_cov.push_back(tmp/arm_size);
     }
     // Now that we have the coverage for each arm, and the average coverage based on the taxonomic classifications of the reads in the arm, we can compare and see if they match what we should be seeing
     // Assumption is that each arm should have similar coverage as the species it comes from. If it does we call it a bubble

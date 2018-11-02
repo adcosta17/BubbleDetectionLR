@@ -169,7 +169,7 @@ int main(int argc, char** argv)
     }
     map<string, string> read_full_taxonomy;
     map<string, string> read_lowest_taxonomy;
-    map<string, int> classification_count;
+    map<string, long> classification_count;
     map<string, float> classification_avg_coverage;
     std::ofstream n50Output;
     n50Output.open(outputFileName+"_assembly_stats.txt");
@@ -216,7 +216,7 @@ int main(int argc, char** argv)
             if(classification_count.count(classification) == 0){
                 classification_count.insert(make_pair(classification,0));
             }
-            classification_count[classification] += 1;
+            classification_count[classification] += read_lengths[id];
             if(col){
                 for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it) {
                     if (result[result.size() - 1].find(it->first) != std::string::npos) {
@@ -230,7 +230,7 @@ int main(int argc, char** argv)
             for (map<string, string>::iterator it = read_full_taxonomy.begin(); it != read_full_taxonomy.end(); ++it)
             {
                 string c = it->second;
-                int n = classification_count[c];
+                long n = classification_count[c];
                 if(classification_avg_coverage.count(c) == 0){
                     classification_avg_coverage.insert(make_pair(c, 0.0));
                 }
@@ -344,6 +344,22 @@ int main(int argc, char** argv)
         cerr << "Removed internal bubbles round "<< i+1 << endl;
 	}
 
+    bubble_sets.clear();
+    read_indegree.clear();
+    read_outdegree.clear();
+    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        //Look for nodes that have at least 2 valid neighbours
+        if(read_indegree[*it].size() >= 2){
+            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_indegree[*it]);
+        }
+        if(read_outdegree[*it].size() >= 2){
+            MatchUtils::find_bubble(*it, read_indegree, read_outdegree, bubble_sets, read_outdegree[*it]);
+        }
+    }
+    seen_bubbles.clear();
+
     // Check to find sets that are unique less the two ends of the pair
     // A true bubble will have reads that only appear in the bubble
     // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
@@ -368,13 +384,13 @@ int main(int argc, char** argv)
         float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
         bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
     	if(tax && coverage){
-            tax_and_cov = MatchUtils::validBubbleTaxCov(arms, read_coverage, classification_avg_coverage, read_full_taxonomy);
+            tax_and_cov = MatchUtils::validBubbleTaxCov(arms, read_coverage, classification_avg_coverage, read_full_taxonomy, read_lengths);
     	}
         if(tax) {
             tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
     	}
         if (coverage){
-    		cov_only = MatchUtils::validBubbleCov(arms, read_coverage);
+    		cov_only = MatchUtils::validBubbleCov(arms, read_coverage, read_lengths);
     	}
 	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
 	    float arm_ratio = MatchUtils::getArmLengthRatio(arms, all_matches);
