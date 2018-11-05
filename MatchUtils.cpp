@@ -1018,65 +1018,303 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
     }
 }
 
-void recurse_bubble_arm(std::string id, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::string>& tmp){
-	if(std::find(tmp.begin(), tmp.end(), id) == tmp.end()){
-		tmp.push_back(id);
-	}
+int recurse_bubble_arm(std::string id, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string>>& tmp_arms, int path_num, std::string prev){
+    // Check the path that we are on to make sure it doesn't exceed the read set size
+    bool print = false;
+    //if(end == "2484"){
+    //    print = true;
+    //}
+    if(tmp_arms[path_num].size() > reads.size()){
+        return path_num;
+    }
+    if(std::find(tmp_arms[path_num].begin(), tmp_arms[path_num].end(), id) == tmp_arms[path_num].end()){
+		tmp_arms[path_num].push_back(id);
+        if(print){
+            std::cerr << "Adding " << id << " to path" << std::endl;
+        }
+	} else {
+        if(print){
+            std::cerr << "Already Seen "<< id << std::endl;
+        }
+        return path_num;
+    }
 	// Next check each neighbour of the id
 	// There should only be one neighbour that is in the set of reads
 	// If this read is our end, then return this arm, otherwise recurse to it
-	std::string id_to_take = "";
-	for(int i = 0; i < read_indegree[id].size(); i++){
-        if(reads.count(read_indegree[id][i]) > 0){
-            if(std::find(tmp.begin(), tmp.end(), read_indegree[id][i]) == tmp.end()){
-				// Id is in our read set and we haven't taken it
-				id_to_take = read_indegree[id][i];
-				break;
-			}           
+	std::vector<std::string> ids_to_take;
+    // First check which direction we came in on, ie look at the last node in tmp_arms[path_num]
+    // Want to leave in opposite direction, If we came in via reads indegree, leave on outdgree
+    if(std::find(read_indegree[id].begin(), read_indegree[id].end(), prev) == read_indegree[id].end()){
+    	for(int i = 0; i < read_indegree[id].size(); i++){
+            if(reads.count(read_indegree[id][i]) > 0){
+                if(std::find(tmp_arms[path_num].begin(), tmp_arms[path_num].end(), read_indegree[id][i]) == tmp_arms[path_num].end()){
+    				// Id is in our read set and we haven't taken it
+                    if(print){
+                        std::cerr << "Adding I " << read_indegree[id][i] << " to ids_to_take" << std::endl;
+                    }
+    				ids_to_take.push_back(read_indegree[id][i]);
+    			}           
+            }
         }
-    }
-    if(id_to_take == ""){
+    } else {
 	    for(int i = 0; i < read_outdegree[id].size(); i++){
 	        if(reads.count(read_outdegree[id][i]) > 0){
-	            if(std::find(tmp.begin(), tmp.end(), read_outdegree[id][i]) == tmp.end()){
+	            if(std::find(tmp_arms[path_num].begin(), tmp_arms[path_num].end(), read_outdegree[id][i]) == tmp_arms[path_num].end()){
 					// Id is in our read set and we haven't taken it
-					id_to_take = read_outdegree[id][i];
+                    if(print){
+                        std::cerr << "Adding O " << read_outdegree[id][i] << " to ids_to_take" << std::endl;
+                    }
+					ids_to_take.push_back(read_outdegree[id][i]);
 				}
 	        }
 	    }
 	}
-	if(id_to_take == end){
-		tmp.push_back(id_to_take);
-		return;
+    if(ids_to_take.size() == 1){
+        // Either have another read in path or we have reached the end
+        if(ids_to_take[0] == end){
+            if(print){
+                std::cerr << "Found end, returning" << std::endl;
+            }
+            tmp_arms[path_num].push_back(end);
+            return path_num;
+        }
+        // Continue on same path with next read
+        if(print){
+            std::cerr << "Continue to " << ids_to_take[0] << std::endl;
+        }
+        return recurse_bubble_arm(ids_to_take[0], end, reads, read_indegree, read_outdegree, tmp_arms, path_num, id);
 	}
-	if(id_to_take != ""){
-		recurse_bubble_arm(id_to_take, end, reads, read_indegree, read_outdegree, tmp);
+	else if(ids_to_take.size() > 1){
+        // Now need to go through each possible branch we have
+        int tmp_path_num = path_num;
+        std::vector<std::string> path_so_far = tmp_arms[path_num];
+        if(ids_to_take[0] == end){
+            if(print){
+                std::cerr << "Found end, returning" << std::endl;
+            }
+            tmp_arms[path_num].push_back(end);
+        } else {
+            if(print){
+                std::cerr << "Multiple Path, going to " << ids_to_take[0] << std::endl;
+            }
+            tmp_path_num = recurse_bubble_arm(ids_to_take[0], end, reads, read_indegree, read_outdegree, tmp_arms, tmp_path_num, id);
+        }
+        for(int i = 1; i < ids_to_take.size(); i++){
+            if(tmp_arms.size() == tmp_path_num + 1){
+                // Need to create a new vector that is a copy of current path and
+                std::vector<std::string> tmp = path_so_far;
+                tmp_arms.push_back(tmp);
+            }
+            if(ids_to_take[i] == end){
+                if(print){
+                    std::cerr << "Found end, returning" << std::endl;
+                }
+                tmp_arms[tmp_path_num + 1].push_back(end);
+                tmp_path_num++;
+            } else {
+                if(print){
+                    std::cerr << "Multiple Path, going to " << ids_to_take[0] << std::endl;
+                }
+                tmp_path_num = recurse_bubble_arm(ids_to_take[i], end, reads, read_indegree, read_outdegree, tmp_arms, tmp_path_num + 1, id);
+            }
+        }
+        return tmp_path_num;
 	}
+    return path_num;
 
 }
 
 void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string> >& arms){
     // Know that if we get here there is a path between start and end that is seperate from one another.
     // Check indegree and then outdgree. If we have an edge from start to a read in our read set, then recurse over it, until we get to end
-    for(int i = 0; i < read_indegree[start].size(); i++){
-        if(reads.count(read_indegree[start][i]) > 0){
-            // Edge is valid, take it
-            std::vector<std::string> tmp;
-            tmp.push_back(start);
-            recurse_bubble_arm(read_indegree[start][i], end, reads, read_indegree, read_outdegree, tmp);
-            arms.push_back(tmp);
+    bool print = false;
+    //if(start == "3219"){
+        //print = true;
+    //    std::cerr << "Start "<< start << " End "<< end << std::endl;
+    //}
+    if(read_indegree[start].size() > 1){
+        std::vector<std::vector<std::string>> tmp_arms;
+        for(int i = 0; i < read_indegree[start].size(); i++){
+            if(reads.count(read_indegree[start][i]) > 0){
+                // Edge is valid, take it
+                std::vector<std::string> tmp;
+                tmp.push_back(start);
+                tmp_arms.push_back(tmp);
+                recurse_bubble_arm(read_indegree[start][i], end, reads, read_indegree, read_outdegree, tmp_arms, tmp_arms.size() - 1, start);
+            }
         }
-    }
-    for(int i = 0; i < read_outdegree[start].size(); i++){
-        if(reads.count(read_outdegree[start][i]) > 0){
-            // Edge is valid, take it
-            std::vector<std::string> tmp;
-            tmp.push_back(start);
-            recurse_bubble_arm(read_outdegree[start][i], end, reads, read_indegree, read_outdegree, tmp);
-            arms.push_back(tmp);
+        std::vector<bool> to_keep;
+        int keep_count = 0;
+        std::map<int, int> ms_count;
+        if(print){
+            std::cerr << "Arms:" << std::endl;
+            for(int i = 0; i < tmp_arms.size(); i++){
+                for(int j = 0; j < tmp_arms[i].size(); j++){
+                    std::cerr << tmp_arms[i][j] << " ";
+                }
+                std::cerr << std::endl;
+            }
+            std::cerr << std::endl;
         }
-    }
+        for(int i = 0; i < tmp_arms.size(); i++){
+            // Check if we get to the end in each arm of temp_arms
+            ms_count.insert(std::make_pair(i,0));
+            if(std::find(tmp_arms[i].begin(), tmp_arms[i].end(), end) == tmp_arms[i].end()){
+                to_keep.push_back(false);
+            } else {
+                to_keep.push_back(true);
+                keep_count++;
+            }
+        }
 
+        if(tmp_arms.size() < 2){
+            return;
+        }
+        if(tmp_arms.size() == 2){
+            if(to_keep[0] == true && to_keep[1] == true){
+                arms = tmp_arms;
+            }
+            return;
+        }
+        if(keep_count < 2){
+            return;
+        }
+        if(keep_count == 2){
+            for(int i = 0; i < tmp_arms.size(); i++){
+                if(to_keep[i]){
+                    arms.push_back(tmp_arms[i]);
+                }
+            }
+            return;
+        }
+        // now check for mutually exclusive arms, remove start and end points from each arm and see
+        for(int i = 0; i< tmp_arms.size(); i++){
+            for(int j = 1; j< tmp_arms.size(); j++){
+                if(j <= i){
+                    // either seen this combination or both are same
+                    continue;
+                }
+                if(!to_keep[i] || !to_keep[j]){
+                    continue;
+                }
+                std::vector<std::string> v3;
+
+                std::sort(tmp_arms[i].begin(), tmp_arms[i].end());
+                std::sort(tmp_arms[j].begin(), tmp_arms[j].end());
+
+                std::set_intersection(tmp_arms[i].begin(),tmp_arms[i].end(),tmp_arms[j].begin(),tmp_arms[j].end(),std::back_inserter(v3));
+                if(v3.size() == 2){
+                    // should have just the start and end reads that are the same
+                    ms_count[i]++;
+                    ms_count[j]++;
+                }
+            }
+        }
+        // Now find all arms that have the maximum count
+        int max_val = 0;
+        for(int i = 0; i < tmp_arms.size(); i++){
+            if(ms_count[i] > max_val){
+                max_val = ms_count[i];
+            }
+        }
+        for(int i = 0; i < tmp_arms.size(); i++){
+            if(ms_count[i] == max_val){
+                arms.push_back(tmp_arms[i]);
+            }
+        }
+        return;
+    }
+    if(read_outdegree[start].size() > 1 && arms.size() == 0){
+        // If there are arms then we must have hit the end from paths above, no need to check outdegree for this bubble
+        std::vector<std::vector<std::string>> tmp_arms;
+        for(int i = 0; i < read_outdegree[start].size(); i++){
+            if(reads.count(read_outdegree[start][i]) > 0){
+                // Edge is valid, take it
+                std::vector<std::string> tmp;
+                tmp.push_back(start);
+                tmp_arms.push_back(tmp);
+                recurse_bubble_arm(read_outdegree[start][i], end, reads, read_indegree, read_outdegree, tmp_arms, tmp_arms.size() - 1, start);              
+            }
+        }
+        std::vector<bool> to_keep;
+        int keep_count = 0;
+        std::map<int, int> ms_count;
+        if(print){
+            std::cerr << "Arms:" << std::endl;
+            for(int i = 0; i < tmp_arms.size(); i++){
+                for(int j = 0; j < tmp_arms[i].size(); j++){
+                    std::cerr << tmp_arms[i][j] << " ";
+                }
+                std::cerr << std::endl;
+            }
+            std::cerr << std::endl;
+        }
+        for(int i = 0; i < tmp_arms.size(); i++){
+            // Check if we get to the end in each arm of temp_arms
+            ms_count.insert(std::make_pair(i,0));
+            if(std::find(tmp_arms[i].begin(), tmp_arms[i].end(), end) == tmp_arms[i].end()){
+                to_keep.push_back(false);
+            } else {
+                to_keep.push_back(true);
+                keep_count++;
+            }
+        }
+
+        if(tmp_arms.size() < 2){
+            return;
+        }
+        if(tmp_arms.size() == 2){
+            if(to_keep[0] == true && to_keep[1] == true){
+                arms = tmp_arms;
+            }
+            return;
+        }
+        if(keep_count < 2){
+            return;
+        }
+        if(keep_count == 2){
+            for(int i = 0; i < tmp_arms.size(); i++){
+                if(to_keep[i]){
+                    arms.push_back(tmp_arms[i]);
+                }
+            }
+            return;
+        }
+        for(int i = 0; i< tmp_arms.size(); i++){
+            for(int j = 1; j< tmp_arms.size(); j++){
+                if(j <= i){
+                    // either seen this combination or both are same
+                    continue;
+                }
+                if(!to_keep[i] || !to_keep[j]){
+                    continue;
+                }
+                std::vector<std::string> v3;
+
+                std::sort(tmp_arms[i].begin(), tmp_arms[i].end());
+                std::sort(tmp_arms[j].begin(), tmp_arms[j].end());
+
+                std::set_intersection(tmp_arms[i].begin(),tmp_arms[i].end(),tmp_arms[j].begin(),tmp_arms[j].end(),std::back_inserter(v3));
+                if(v3.size() == 2){
+                    // should have just the start and end reads that are the same
+                    ms_count[i]++;
+                    ms_count[j]++;
+                }
+            }
+        }
+        // Now find all arms that have the maximum count
+        int max_val = 0;
+        for(int i = 0; i < tmp_arms.size(); i++){
+            if(ms_count[i] > max_val){
+                max_val = ms_count[i];
+            }
+        }
+        for(int i = 0; i < tmp_arms.size(); i++){
+            if(ms_count[i] == max_val){
+                arms.push_back(tmp_arms[i]);
+            }
+        }
+    }
 }
 
 bool MatchUtils::check_bubble(std::string start, std::string end, std::set<std::string> reads, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree)

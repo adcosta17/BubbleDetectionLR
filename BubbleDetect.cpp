@@ -379,6 +379,19 @@ int main(int argc, char** argv)
             //cerr << (it->first).first << " " << (it->first).second << " " << arms.size() << endl;
             continue;
         }
+
+        //print out bubble arms for valid bubbles
+        cerr << endl;
+        cerr << "Arms for bubble between " << (it->first).first << " and " << (it->first).second << endl;
+        for(int i = 0; i < arms[0].size(); i++){
+            cerr << arms[0][i] << " ";
+        }
+        cerr << endl;
+        for(int i = 0; i < arms[1].size(); i++){
+            cerr << arms[1][i] << " ";
+        }
+        cerr << endl;
+
         vector<float> tax_and_cov; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
         bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
         float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
