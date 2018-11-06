@@ -367,95 +367,141 @@ int main(int argc, char** argv)
     bubbleOutput.open(outputFileName+"_bubble_list.txt");
     for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
     {    
-        // First check if Bubble contains 
+        if((it->first).first == (it->first).second){
+            // Loop Bubble, don't want to consider this case
+            cerr << "Bubble has same start and end " << (it->first).first << " and " << (it->first).second << endl;
+            seen_bubbles.insert(it->first);
+            continue;
+        }
 
     	// Four ways of validating.
     	// If we have taxinomic info and coverage, coverage only, taxonomy only and neither of the two
         vector<vector<string> > arms;
-        if(tax || coverage){
-            MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
-        }
-        if(arms.size() != 2){
-            //cerr << (it->first).first << " " << (it->first).second << " " << arms.size() << endl;
+        MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
+        if(arms.size() < 2){
+            cerr << "Bubble has less than 2 arms " << (it->first).first << " and " << (it->first).second << endl;
+            seen_bubbles.insert(it->first);
             continue;
         }
 
-        //print out bubble arms for valid bubbles
-        cerr << endl;
-        cerr << "Arms for bubble between " << (it->first).first << " and " << (it->first).second << endl;
-        for(int i = 0; i < arms[0].size(); i++){
-            cerr << arms[0][i] << " ";
+        if(seen_bubbles.count(it->first) != 0 || seen_bubbles.count(make_pair((it->first).second, (it->first).first)) != 0){
+            cerr << "Already Seen " << (it->first).first << " and " << (it->first).second << endl;
+            continue;
         }
-        cerr << endl;
-        for(int i = 0; i < arms[1].size(); i++){
-            cerr << arms[1][i] << " ";
+
+        for(int i = 0; i<arms.size(); i++){
+            for(int j = 1; j < arms.size(); j++){
+                if(i >= j){
+                    continue;
+                }
+
+                vector<string> v1 = arms[i];
+                vector<string> v2 = arms[j];
+                vector<string> v3;
+                sort(v1.begin(), v1.end());
+                sort(v2.begin(), v2.end());
+                set_intersection(v1.begin(),v1.end(),v2.begin(),v2.end(),back_inserter(v3));
+                if(v3.size() != 2){
+                    // should have just the start and end reads that are the same, otherwise the bubble are smaller than reported
+                    cerr << "Non Exclusive Arms for " << (it->first).first << " and " << (it->first).second << endl;
+                    continue;
+                }    
+        
+                
+                //print out bubble arms for valid bubbles
+                cerr << endl;
+                cerr << "Arms for bubble between " << (it->first).first << " and " << (it->first).second << endl;
+                for(int k = 0; k < arms[i].size(); k++){
+                    cerr << arms[i][k] << " ";
+                }
+                cerr << endl;
+                for(int k = 0; k < arms[j].size(); k++){
+                    cerr << arms[j][k] << " ";
+                }
+                cerr << endl;
+                
+
+                // Figure out which arm is the longer one
+                // We will have the longer arm be A and our shorter arm be B
+                // Don't count start and end reads
+                vector<vector<string> > tmp_arms;
+                if(arms[i].size() >= arms[j].size()){
+                    tmp_arms.push_back(arms[i]);
+                    tmp_arms.push_back(arms[j]);
+                } else {
+                    tmp_arms.push_back(arms[j]);
+                    tmp_arms.push_back(arms[i]);
+                }
+
+                vector<float> tax_and_cov; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
+                bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
+                float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
+                bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
+            	if(tax && coverage){
+                    tax_and_cov = MatchUtils::validBubbleTaxCov(tmp_arms, read_coverage, classification_avg_coverage, read_full_taxonomy, read_lengths);
+            	}
+                if(tax) {
+                    tax_only = MatchUtils::validBubbleTax(tmp_arms, read_lowest_taxonomy);
+            	}
+                if (coverage){
+            		cov_only = MatchUtils::validBubbleCov(tmp_arms, read_coverage, read_lengths);
+            	}
+        	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
+        	    float arm_ratio = MatchUtils::getArmLengthRatio(tmp_arms, all_matches);
+          
+                // Score Bubbles based on values seen
+                //Linear:   
+                float weights[7] = {0.004047, 0.012653, 0.452049, 0.016768, 0.068084, -0.616781, 0.058613};
+                //Logistic:
+                //int weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
+                float score = 0.0;
+                score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
+                if(true_bubble){
+                    score += weights[1];
+                }
+                if(tax_and_cov.size() == 2){
+                   score += tax_and_cov[0]*weights[2];
+                   score += tax_and_cov[1]*weights[3];
+                }
+                if(tax_only){
+                    score += weights[4];
+                }
+                score += cov_only*weights[5];
+                score += arm_ratio*weights[6];
+
+                bubbleOutput << score << "\t";
+                bubbleOutput << tmp_arms[0].size()+tmp_arms[1].size() << "\t";
+                if(true_bubble){
+                    bubbleOutput << 1;
+                } else {
+                    bubbleOutput << 0;
+                }
+                bubbleOutput << "\t";
+                if(tax_and_cov.size() == 2){
+                    bubbleOutput << tax_and_cov[0] << "\t" << tax_and_cov[1];
+                } else {
+                    bubbleOutput << 0 << "\t" << 0;
+                }
+                bubbleOutput << "\t";
+                if(tax_only){
+                    bubbleOutput << 1;
+                } else {
+                    bubbleOutput << 0;
+                }
+                bubbleOutput << "\t" << cov_only << "\t" << arm_ratio << "\t";
+                bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t";
+                for(int k = 0; k < tmp_arms[0].size(); k++){
+                    bubbleOutput << tmp_arms[0][k] << " ";
+                }
+                bubbleOutput << "\t";
+                for(int k = 0; k < tmp_arms[1].size(); k++){
+                    bubbleOutput << tmp_arms[1][k] << " ";
+                }
+                bubbleOutput << endl;
+                
+            }
         }
-        cerr << endl;
-
-        vector<float> tax_and_cov; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
-        bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
-        float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
-        bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
-    	if(tax && coverage){
-            tax_and_cov = MatchUtils::validBubbleTaxCov(arms, read_coverage, classification_avg_coverage, read_full_taxonomy, read_lengths);
-    	}
-        if(tax) {
-            tax_only = MatchUtils::validBubbleTax(arms, read_lowest_taxonomy);
-    	}
-        if (coverage){
-    		cov_only = MatchUtils::validBubbleCov(arms, read_coverage, read_lengths);
-    	}
-	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
-	    float arm_ratio = MatchUtils::getArmLengthRatio(arms, all_matches);
-
-        if(seen_bubbles.count(it->first) == 0 && seen_bubbles.count(std::make_pair((it->first).second, (it->first).first)) == 0){
-            
-            // Score Bubbles based on values seen
-            //Linear:   
-            float weights[7] = {0.004047, 0.012653, 0.452049, 0.016768, 0.068084, -0.616781, 0.058613};
-            //Logistic:
-            //int weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
-            float score = weights[0]*it->second.size();
-            if(true_bubble){
-                score += weights[1];
-            }
-            if(tax_and_cov.size() == 2){
-               score += tax_and_cov[0]*weights[2];
-               score += tax_and_cov[1]*weights[3];
-            }
-            if(tax_only){
-                score += weights[4];
-            }
-            score += cov_only*weights[5];
-            score += arm_ratio*weights[6];
-
-            bubbleOutput << score << "\t";
-            bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t" << it->second.size() << "\t";
-            if(true_bubble){
-                bubbleOutput << 1;
-            } else {
-                bubbleOutput << 0;
-            }
-            bubbleOutput << "\t";
-            if(tax_and_cov.size() == 2){
-                bubbleOutput << tax_and_cov[0] << "\t" << tax_and_cov[1];
-            } else {
-                bubbleOutput << 0 << "\t" << 0;
-            }
-            bubbleOutput << "\t";
-            if(tax_only){
-                bubbleOutput << 1;
-            } else {
-                bubbleOutput << 0;
-            }
-            bubbleOutput << "\t";
-            bubbleOutput << cov_only;
-            bubbleOutput << "\t";
-            bubbleOutput << arm_ratio;
-            bubbleOutput << endl;
-            
-            seen_bubbles.insert(it->first);
-        }
+        seen_bubbles.insert(it->first);
     }
     bubbleOutput.close();
 

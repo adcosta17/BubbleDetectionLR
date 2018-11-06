@@ -444,11 +444,7 @@ float MatchUtils::getArmLengthRatio(std::vector<std::vector<std::string> >& arms
         }
         avg_len.push_back(tmp);
     }
-    if(avg_len[0] > avg_len[1]){
-        return avg_len[0]/avg_len[1];
-    } else {
-        return avg_len[1]/avg_len[0];
-    }
+    return avg_len[0]/avg_len[1];
 }
 
 float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, int>& read_lengths){
@@ -468,25 +464,8 @@ float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, s
         }
         avg_cov.push_back(tmp/arm_size);
     }
-    float ratio = 0.0;
-    for (int i = 0; i < avg_cov.size(); ++i)
-    {
-        for (int j = 0; j < avg_cov.size(); ++j)
-        {
-            // Compare the average coverages between arms, ensure that one isn't super low compared to the other
-            if(i == j) {
-                continue;
-            } 
-            if(avg_cov[i] > avg_cov[j]){
-                ratio = avg_cov[j]/avg_cov[i];
-            } else {
-                ratio = avg_cov[i]/avg_cov[j];
-            }
-            if(ratio < 0.25){
-                valid = false;
-            }
-        }
-    }
+    // know there should only be two arms
+    float ratio = avg_cov[0]/avg_cov[1];
     return ratio;
 }
 
@@ -510,27 +489,10 @@ void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::str
             	continue;
             }
             // Now check to see which set is larger
-            /*
-            if(((it->first).second == "2920" || (it->first).first == "2920") && ((it2->first).second == "563" || (it2->first).first == "563")){
-            	cout << (it->first).second << " " << (it->first).first << " In " << (it2->first).second << " " <<  (it2->first).first;
-            	cout << " " << it->second.size() << " " << it2->second.size() << endl;
-            	for(set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
-            		cout << " " << *it3;
-            	}
-            	cout << endl;
-            	for(set<string>::iterator it3=it2->second.begin(); it3 != it2->second.end(); it3++){
-            		cout << " " << *it3;
-            	}
-            	cout << endl;
-            }
-            */
             if(it->second.size() < it2->second.size()){
                 set<string> intersect;
                 set_intersection(it->second.begin(),it->second.end(),it2->second.begin(),it2->second.end(),inserter(intersect,intersect.begin()));
                 if(intersect.size() == it->second.size()){
-                	//if((it->first).second == "2920" || (it->first).first == "2920"){
-                	//	cout << (it->first).second << " " << (it->first).first << " In " << (it2->first).second << " " <<  (it2->first).first << endl;
-                	//}
                     // All nodes are contained in this larger bubble
                     // Should now evaluate each node and its edges to see if they should be kept or removed 
                     for(set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
@@ -1197,12 +1159,12 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
                 if(!to_keep[i] || !to_keep[j]){
                     continue;
                 }
+                std::vector<std::string> v1 = tmp_arms[i];
+                std::vector<std::string> v2 = tmp_arms[j];
                 std::vector<std::string> v3;
-
-                std::sort(tmp_arms[i].begin(), tmp_arms[i].end());
-                std::sort(tmp_arms[j].begin(), tmp_arms[j].end());
-
-                std::set_intersection(tmp_arms[i].begin(),tmp_arms[i].end(),tmp_arms[j].begin(),tmp_arms[j].end(),std::back_inserter(v3));
+                std::sort(v1.begin(), v1.end());
+                std::sort(v2.begin(), v2.end());
+                std::set_intersection(v1.begin(),v1.end(),v2.begin(),v2.end(),std::back_inserter(v3));
                 if(v3.size() == 2){
                     // should have just the start and end reads that are the same
                     ms_count[i]++;
