@@ -501,7 +501,7 @@ int main(int argc, char** argv)
     {    
         if((it->first).first == (it->first).second){
             // Loop Bubble, don't want to consider this case
-            cerr << "Bubble has same start and end " << (it->first).first << " and " << (it->first).second << endl;
+            //cerr << "Bubble has same start and end " << (it->first).first << " and " << (it->first).second << endl;
             seen_bubbles.insert(it->first);
             continue;
         }
@@ -511,13 +511,13 @@ int main(int argc, char** argv)
         vector<vector<string> > arms;
         MatchUtils::get_bubble_arms((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree, arms);
         if(arms.size() < 2){
-            cerr << "Bubble has less than 2 arms " << (it->first).first << " and " << (it->first).second << endl;
+            //cerr << "Bubble has less than 2 arms " << (it->first).first << " and " << (it->first).second << endl;
             seen_bubbles.insert(it->first);
             continue;
         }
 
         if(seen_bubbles.count(it->first) != 0 || seen_bubbles.count(make_pair((it->first).second, (it->first).first)) != 0){
-            cerr << "Already Seen " << (it->first).first << " and " << (it->first).second << endl;
+            //cerr << "Already Seen " << (it->first).first << " and " << (it->first).second << endl;
             continue;
         }
 
@@ -535,11 +535,11 @@ int main(int argc, char** argv)
                 set_intersection(v1.begin(),v1.end(),v2.begin(),v2.end(),back_inserter(v3));
                 if(v3.size() != 2){
                     // should have just the start and end reads that are the same, otherwise the bubble are smaller than reported
-                    cerr << "Non Exclusive Arms for " << (it->first).first << " and " << (it->first).second << endl;
+                    //cerr << "Non Exclusive Arms for " << (it->first).first << " and " << (it->first).second << endl;
                     continue;
                 }    
         
-                
+                /*
                 //print out bubble arms for valid bubbles
                 cerr << endl;
                 cerr << "Arms for bubble between " << (it->first).first << " and " << (it->first).second << endl;
@@ -551,7 +551,7 @@ int main(int argc, char** argv)
                     cerr << arms[j][k] << " ";
                 }
                 cerr << endl;
-                
+                */
 
                 // Figure out which arm is the longer one
                 // We will have the longer arm be A and our shorter arm be B
