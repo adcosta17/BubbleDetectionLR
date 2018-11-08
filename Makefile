@@ -1,4 +1,4 @@
-all: BubbleDetect PafSubset ReadClassificationGen SplitFastq
+all: BubbleDetect PafSubset ReadClassificationGen SplitFastq CombinePaf
 
 BubbleDetect: BubbleDetect.cpp Match.hpp Match.cpp MatchUtils.cpp MatchUtils.hpp Read.cpp Read.hpp
 	g++ -g -std=c++11 -lboost_iostreams BubbleDetect.cpp Match.cpp MatchUtils.cpp Read.cpp -o BubbleDetect
@@ -11,6 +11,9 @@ ReadClassificationGen: ReadClassificationGen.cpp
 
 SplitFastq: SplitFastq.cpp Read.cpp
 	g++ -g -std=c++11 -lboost_iostreams SplitFastq.cpp Read.cpp -lm -lz -o SplitFastq
+
+CombinePaf: CombinePaf.cpp
+	g++ -g -std=c++11 -lboost_iostreams CombinePaf.cpp -lm -lz -o CombinePaf
 
 clean:
 	rm BubbleDetect PafSubset ReadClassificationGen SplitFastq

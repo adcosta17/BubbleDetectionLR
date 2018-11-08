@@ -62,7 +62,7 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     }
 }
 
-std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, bool raw){
+std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw){
 	using namespace std;
 
 	io::filtering_istream in;
@@ -123,7 +123,8 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
         		all_matches.insert(pair<string, vector<Match> >(c6,tmp));
         	}
 	        // Determine which list to store under based on lexographic comparison
-	        // Should never have equality here, check done above already 
+	        // Should never have equality here, check done above already
+            tmpLine.overlap_species = name;
 	        if(c1 < c6) {
 	        	all_matches[c1].push_back(tmpLine);
 	        } else {
@@ -204,7 +205,7 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
         map<string, vector<Match>> tmp_raw_matches;
         map<string, vector<string> > read_indegree;
         map<string, vector<string> > read_outdegree;
-		vector<int> sizes = get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, false);
+		vector<int> sizes = get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
         if(sizes.size() == 0){
             continue;
         }
@@ -305,7 +306,7 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_l
 	cerr << "Reading in all valid Matches" << endl;
 
 	read_ids.clear();
-	vector<int> sizes = get_all_matches_for_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, false);
+	vector<int> sizes = get_all_matches_for_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", false);
 
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
 }
@@ -609,7 +610,7 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
     return valid;
 }
 
-std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& classification_avg_coverage, std::map<std::string, std::string>& read_full_taxonomy, std::map<std::string, int>& read_lengths){
+std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& per_species_coverage, std::map<std::string, std::string>& read_levels, std::map<std::string, int>& read_lengths, bool binned, std::map<std::string, std::vector<Match> >& all_matches){
     // Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
     // And then see if it matches what coverage the arms have
     bool valid = true;
@@ -636,16 +637,44 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     {
         float tmp = 0.0;
         int arm_size = 0;
-        for (int j = 0; j < arms[i].size(); ++j)
-        {
-            if(j == 0 || j == arms[i].size()){
-                //ignore the first read, this is the start, and ignore the last one, the end. These are shared so they shouldn't be used to distinguish arms
-                continue;
+        if(binned){
+            // Need to use all_matches here
+            for (int j = 0; j < arms[i].size()-1; ++j)
+            {
+                // First find the overlap between read j and j + 1
+                std::string species = "";
+                if(arms[i][j] < arms[i][j+1]){
+                    for(int k = 0; k < all_matches[arms[i][j]].size();k++){
+                        if(all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1] ||
+                            all_matches[arms[i][j]][k].target_read_id == arms[i][j] && all_matches[arms[i][j]][k].query_read_id == arms[i][j+1]){
+                            // Found match
+                            species = all_matches[arms[i][j]][k].overlap_species;
+                        }
+                    }
+                } else {
+                    for(int k = 0; k < all_matches[arms[i][j+1]].size();k++){
+                        if(all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1] ||
+                            all_matches[arms[i][j+1]][k].target_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1]){
+                            // Found match
+                            species = all_matches[arms[i][j+1]][k].overlap_species;
+                        }
+                    }
+                }
+                tmp += per_species_coverage[species] * (read_lengths[arms[i][j]]/2 + read_lengths[arms[i][j+1]]/2);
+                arm_size += read_lengths[arms[i][j]]/2 + read_lengths[arms[i][j+1]]/2;
+            }     
+        } else {
+            for (int j = 0; j < arms[i].size(); ++j)
+            {
+                if(j == 0 || j == arms[i].size()-1){
+                    //ignore the first read, this is the start, and ignore the last one, the end. These are shared so they shouldn't be used to distinguish arms
+                    continue;
+                }
+                // Otherwise get the edge lengths of each overlap, and then weight each read's coverage. Each read should have a classification. 
+                // If it doesn't then use the read coverage
+                tmp += per_species_coverage[read_levels[arms[i][j]]] * read_lengths[arms[i][j]];
+                arm_size += read_lengths[arms[i][j]];
             }
-            // Otherwise get the edge lengths of each overlap, and then weight each read's coverage. Each read should have a classification. 
-            // If it doesn't then use the read coverage
-            tmp += (classification_avg_coverage[read_full_taxonomy[arms[i][j]]] * read_lengths[arms[i][j]]);
-            arm_size += read_lengths[arms[i][j]];
         }
         arm_tax_cov.push_back(tmp/arm_size);
     }

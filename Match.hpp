@@ -27,6 +27,7 @@ public:
 	int length;
 	int orientation;
 	int length_to_use;
+	std::string overlap_species; 
 
 	Match(std::string qrid,
 		int qrl,

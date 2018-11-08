@@ -55,7 +55,9 @@ void Read::setTaxonomy(std::vector<std::string>& tmp){
 bool Read::parentLevel(std::string level){
 	//Check each level down to the requested comparison level, or until classification runs out
 	//Function only called if exact match on requested level not found
-
+	if(level == ""){
+		return true;
+	}
 	if(domain != "" && level.find(domain) == std::string::npos){
 		return false;
 	}

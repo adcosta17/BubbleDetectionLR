@@ -6,6 +6,7 @@
 #include <regex>
 #include <cstdlib>
 #include <sys/stat.h>
+#include <dirent.h>
 #include "MatchUtils.hpp"
 
 bool sortSecond(const std::pair<std::string, int>& a, const std::pair<std::string, int>& b){
@@ -33,9 +34,11 @@ int main(int argc, char** argv)
     bool col = false;
     bool chimeric = false;
     bool coverage = false;
+    bool mpa = false;
+    bool binned = false;
     int opt, iterations = 10, fuzz = 1000, threshold = 5;
-    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:")) != EOF)
+    string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:")) != EOF)
     {
         switch(opt)
         {
@@ -44,6 +47,7 @@ int main(int argc, char** argv)
             case 'r': taxonomy_file = optarg; tax = true; break;
             case 's': colour_file = optarg; col = true; break;
             case 'h': chimeric_read_file = optarg; chimeric = true; break;
+            case 'm': mpa_file = optarg; mpa = true; break;
             case 'i': iterations = atoi(optarg); break;
             case 'f': fuzz = atoi(optarg); break;
             case 't': threshold = atoi(optarg); break;
@@ -63,7 +67,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n";
         return 0;
     }
 
@@ -76,6 +80,12 @@ int main(int argc, char** argv)
     set<string> chimeric_reads;
     map<string, Read> read_classification;
     map<string, float> read_coverage;
+    map<string, string> read_levels;
+    map<string, string> read_full_taxonomy;
+    map<string, string> read_lowest_taxonomy;
+    map<string, float> classification_avg_coverage;
+    map<string, float> per_species_coverage;
+    map<string, set<string>> read_groups;
 
     if(chimeric){
         cerr << "Reading in Chimeric Read List" << endl;
@@ -92,20 +102,160 @@ int main(int argc, char** argv)
             //cout << id << endl;
         }
     }
-
+    
     if(coverage){
-        cerr << "Reading in Read Coverage List" << endl;
-        ifstream inputFileCoverage(coverage_file);
-        string line;
-        while (getline(inputFileCoverage, line, '\n'))
-        {
-            istringstream lin(line);
-            string id;
-            int len;
-            float cov;
-            lin >> id >> len >> cov;
-            read_coverage.insert(make_pair(id, cov));
-            //cout << read_coverage[id] << endl;
+        if(!is_file(coverage_file.c_str()) && !is_dir(coverage_file.c_str())){
+            cerr << "Coverage File provided is neither file nor directory" << endl;
+            return 0;
+        } else if(is_file(coverage_file.c_str())){
+            if(mpa){
+                // need the mpa to bin reads based on their classification
+                cerr << "Reading in MPA File" << endl;
+                ifstream inputFile_mpa(mpa_file);
+                map<string, Read> mpa_read_classification;
+                set<string> classification_set;
+                map<string, int> classification_count;
+                classification_set.insert("");
+                set<string> tmp_set;
+                read_groups.insert(make_pair("", tmp_set));
+                string line;
+                while (getline(inputFile_mpa, line))
+                {   
+                    istringstream lin(line);
+                    string id, classification, level;
+                    lin >> id;
+                    getline(lin, classification);
+                    stringstream  data(classification);
+                    vector<string> result;
+                    while(getline(data,level,'|'))
+                    {
+                        result.push_back(level);
+                    }
+                    string tmp = "";
+                    if(mpa_read_classification.count(id) == 0){
+                        Read tmp_read = Read(id, 0);
+                        mpa_read_classification.insert(make_pair(id, tmp_read));
+                        mpa_read_classification.at(id).setTaxonomy(result);
+                    }
+                    vector<char> groups;
+                    groups.push_back('d');
+                    groups.push_back('p');
+                    groups.push_back('c');
+                    groups.push_back('o');
+                    groups.push_back('f');
+                    groups.push_back('g');
+                    groups.push_back('s');
+                    read_levels.insert(make_pair(id, tmp));
+                    read_groups[tmp].insert(id);
+                    for(int k = 0; k < groups.size(); k++){
+                        tmp = mpa_read_classification.at(id).getClassificationForFileName(groups[k]);
+                        if(tmp != ""){
+                            read_levels[id] = tmp;
+                            if(read_groups.count(tmp) == 0){
+                                read_groups.insert(make_pair(tmp, tmp_set));
+                            }
+                            read_groups[tmp].insert(id);
+                        }
+                    }
+                }
+                cerr << "Reading in Read Coverage List" << endl;
+                ifstream inputFileCoverage(coverage_file);
+                map<string, int> num_bases;
+                map<string, float> tmp_read_coverage;
+                while (getline(inputFileCoverage, line, '\n'))
+                {
+                    istringstream lin(line);
+                    string id;
+                    int len;
+                    float cov;
+                    lin >> id >> len >> cov;
+                    read_coverage.insert(make_pair(id, cov));
+                    tmp_read_coverage.insert(make_pair(id, cov*len));
+                    for(map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
+                    {
+                        if(it->second.count(id) > 0){
+                            if(num_bases.count(it->first) == 0){
+                                num_bases.insert(make_pair(it->first, 0));
+                            }
+                            num_bases[it->first] += len;
+                        }
+                    }
+                }
+                for(map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
+                {
+                    per_species_coverage.insert(make_pair(it->first, 0.0));
+                    for (map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
+                    {
+                        per_species_coverage[it->first] += it2->second/num_bases[it->first];
+                    }
+                }
+            }
+        } else if(is_dir(coverage_file.c_str())){
+            // Need to compute the per read coverage for each species
+            binned = true;
+            set<string> cov_files;
+            DIR *dir;
+            struct dirent *ent;
+            string suffix = ".read-cov.txt";
+            string combined_file = "";
+            string combined_suffix = ".combined.read-cov.txt";
+            if ((dir = opendir (coverage_file.c_str())) != NULL) {
+              /* print all the files and directories within directory */
+              while ((ent = readdir (dir)) != NULL) {
+                string name(ent->d_name);
+                //cerr << name << endl;
+                if (name.find(suffix) != string::npos){
+                    if(name.find(combined_suffix) != string::npos){
+                        combined_file = coverage_file + "/" + name;
+                    } else {
+                        cov_files.insert(coverage_file + "/" + name);  
+                        //cerr << file_name + "/" + name << endl;
+                    }
+                }
+              }
+              closedir (dir);
+            }
+            cerr << "Found " << cov_files.size() << " Coverage Files" << endl;
+
+            // Take the list of paf_files and then for each of them read in the file
+            for (set<string>::iterator it = cov_files.begin(); it != cov_files.end(); ++it) {
+                map<string, float> tmp_read_coverage;
+                int num_bases = 0;
+                string cov_fh = *it;
+                ifstream inputFileCoverage(cov_fh);
+                size_t found = cov_fh.find_last_of("/");
+                string name(cov_fh.substr(found+1).substr(0,cov_fh.substr(found+1).size()-11));
+                string line;
+                while (getline(inputFileCoverage, line, '\n'))
+                {
+                    istringstream lin(line);
+                    string id;
+                    int len;
+                    float cov;
+                    lin >> id >> len >> cov;
+                    tmp_read_coverage.insert(make_pair(id, cov*len));
+                    num_bases += len;
+                    //cout << read_coverage[id] << endl;
+                }
+                per_species_coverage.insert(make_pair(name, 0.0));
+                for (map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
+                {
+                    per_species_coverage[name] += it2->second/num_bases;
+                }
+            }
+            // Read in combined PAF classification file from same directory and populate read_coverage with it
+            cerr << "Reading in Read Coverage List" << endl;
+            ifstream inputFileCoverage(combined_file);
+            string line;
+            while (getline(inputFileCoverage, line, '\n'))
+            {
+                istringstream lin(line);
+                string id;
+                int len;
+                float cov;
+                lin >> id >> len >> cov;
+                read_coverage.insert(make_pair(id, cov));
+            }
         }
     }
 
@@ -167,10 +317,7 @@ int main(int argc, char** argv)
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
-    map<string, string> read_full_taxonomy;
-    map<string, string> read_lowest_taxonomy;
-    map<string, long> classification_count;
-    map<string, float> classification_avg_coverage;
+
     std::ofstream n50Output;
     n50Output.open(outputFileName+"_assembly_stats.txt");
 
@@ -213,10 +360,6 @@ int main(int argc, char** argv)
             }
             read_full_taxonomy.insert(make_pair(id, classification));
             read_lowest_taxonomy.insert(make_pair(id, result[result.size() - 1]));
-            if(classification_count.count(classification) == 0){
-                classification_count.insert(make_pair(classification,0));
-            }
-            classification_count[classification] += read_lengths[id];
             if(col){
                 for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it) {
                     if (result[result.size() - 1].find(it->first) != std::string::npos) {
@@ -224,17 +367,6 @@ int main(int argc, char** argv)
                         break;
                     }
                 }
-            }
-        }
-        if(coverage){
-            for (map<string, string>::iterator it = read_full_taxonomy.begin(); it != read_full_taxonomy.end(); ++it)
-            {
-                string c = it->second;
-                long n = classification_count[c];
-                if(classification_avg_coverage.count(c) == 0){
-                    classification_avg_coverage.insert(make_pair(c, 0.0));
-                }
-                classification_avg_coverage[c] += (read_coverage[it->first]/n);
             }
         }
     }
@@ -437,8 +569,8 @@ int main(int argc, char** argv)
                 bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
                 float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
                 bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
-            	if(tax && coverage){
-                    tax_and_cov = MatchUtils::validBubbleTaxCov(tmp_arms, read_coverage, classification_avg_coverage, read_full_taxonomy, read_lengths);
+            	if(tax && coverage && (mpa || binned)){
+                    tax_and_cov = MatchUtils::validBubbleTaxCov(tmp_arms, read_coverage, per_species_coverage, read_levels, read_lengths, binned, all_matches);
             	}
                 if(tax) {
                     tax_only = MatchUtils::validBubbleTax(tmp_arms, read_lowest_taxonomy);
