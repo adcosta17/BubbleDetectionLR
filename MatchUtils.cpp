@@ -613,9 +613,11 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
 std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, float>& per_species_coverage, std::map<std::string, std::string>& read_levels, std::map<std::string, int>& read_lengths, bool binned, std::map<std::string, std::vector<Match> >& all_matches){
     // Can use both the coverage info we have and the taxonomy to get per species/subspecies coverage
     // And then see if it matches what coverage the arms have
-    bool valid = true;
+    bool print = false;
     // We now have each arm of the bubble. Now can compute the coverage for each arm, as the average of the coverage for each read in the arm
-
+    if(arms[0][0] == "4776" || arms[0][0] == "157"){
+        //print = true;
+    }
     std::vector<float> avg_cov;
     for (int i = 0; i < arms.size(); ++i)
     {
@@ -623,9 +625,15 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
         int arm_size = 0;
         for (int j = 0; j < arms[i].size(); ++j)
         {
+            if(print){
+                std::cerr << "Coverage of " << arms[i][j] << " " << read_lengths[arms[i][j]] << " " << read_coverage[arms[i][j]] * read_lengths[arms[i][j]] << std::endl;
+            }
             tmp += (read_coverage[arms[i][j]] * read_lengths[arms[i][j]]);
             arm_size += read_lengths[arms[i][j]];
             //std::cout << arms[i][j] << " " << read_coverage[arms[i][j]] << std::endl;
+        }
+        if(print){
+            std::cerr << "Arm Coverage " << tmp/arm_size << std::endl;
         }
         avg_cov.push_back(tmp/arm_size);
     }
@@ -649,6 +657,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
                             all_matches[arms[i][j]][k].target_read_id == arms[i][j] && all_matches[arms[i][j]][k].query_read_id == arms[i][j+1]){
                             // Found match
                             species = all_matches[arms[i][j]][k].overlap_species;
+                            break;
                         }
                     }
                 } else {
@@ -657,24 +666,32 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
                             all_matches[arms[i][j+1]][k].target_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1]){
                             // Found match
                             species = all_matches[arms[i][j+1]][k].overlap_species;
+                            break;
                         }
                     }
                 }
                 tmp += per_species_coverage[species] * (read_lengths[arms[i][j]]/2 + read_lengths[arms[i][j+1]]/2);
-                arm_size += read_lengths[arms[i][j]]/2 + read_lengths[arms[i][j+1]]/2;
+                arm_size += (read_lengths[arms[i][j]]/2 + read_lengths[arms[i][j+1]]/2);
             }     
         } else {
             for (int j = 0; j < arms[i].size(); ++j)
             {
                 if(j == 0 || j == arms[i].size()-1){
-                    //ignore the first read, this is the start, and ignore the last one, the end. These are shared so they shouldn't be used to distinguish arms
+                    tmp += per_species_coverage[read_levels[arms[i][j]]] * read_lengths[arms[i][j]]/2;
+                    arm_size += read_lengths[arms[i][j]]/2;
                     continue;
                 }
                 // Otherwise get the edge lengths of each overlap, and then weight each read's coverage. Each read should have a classification. 
                 // If it doesn't then use the read coverage
+                if(print){
+                    std::cerr << "Species Coverage of " << arms[i][j] << " " << read_lengths[arms[i][j]] << " " << per_species_coverage[read_levels[arms[i][j]]] * read_lengths[arms[i][j]] << std::endl;
+                }
                 tmp += per_species_coverage[read_levels[arms[i][j]]] * read_lengths[arms[i][j]];
                 arm_size += read_lengths[arms[i][j]];
             }
+        }
+        if(print){
+            std::cerr << "Arm Species Coverage " << tmp/arm_size << std::endl;
         }
         arm_tax_cov.push_back(tmp/arm_size);
     }
@@ -686,6 +703,9 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
         // Compare the average coverages between the arm itself and the species
         ratio_cov.push_back(avg_cov[i]/arm_tax_cov[i]);
         //std::cout << avg_cov[i] << " " << arm_tax_cov[i] << std::endl;
+        if(print){
+            std::cerr << i << " " << avg_cov[i]/arm_tax_cov[i] << std::endl;
+        }
     }
     return ratio_cov;
 }

@@ -169,6 +169,9 @@ int main(int argc, char** argv)
                     int len;
                     float cov;
                     lin >> id >> len >> cov;
+                    if(cov < 1){
+                    	cov = 1.0;
+                    }
                     read_coverage.insert(make_pair(id, cov));
                     tmp_read_coverage.insert(make_pair(id, cov*len));
                     for(map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
@@ -188,6 +191,8 @@ int main(int argc, char** argv)
                     {
                         per_species_coverage[it->first] += it2->second/num_bases[it->first];
                     }
+                    //cerr << it->first << " " << num_bases[it->first] << endl;
+                    //cerr << it->first << " " << per_species_coverage[it->first] << endl;
                 }
             }
         } else if(is_dir(coverage_file.c_str())){
@@ -232,6 +237,9 @@ int main(int argc, char** argv)
                     string id;
                     int len;
                     float cov;
+                    if(cov < 1){
+                    	cov = 1.0;
+                    }
                     lin >> id >> len >> cov;
                     tmp_read_coverage.insert(make_pair(id, cov*len));
                     num_bases += len;
@@ -253,6 +261,9 @@ int main(int argc, char** argv)
                 string id;
                 int len;
                 float cov;
+                if(cov < 1){
+                	cov = 1.0;
+                }
                 lin >> id >> len >> cov;
                 read_coverage.insert(make_pair(id, cov));
             }
