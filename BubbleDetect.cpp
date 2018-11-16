@@ -594,10 +594,10 @@ int main(int argc, char** argv)
           
                 // Score Bubbles based on values seen
                 //Linear:   
-                float weights[7] = {0.004047, 0.012653, 0.452049, 0.016768, 0.068084, -0.616781, 0.058613};
+                float weights[7] = {-0.001033, -0.138183, -0.609115, 0.517615, 0.456659, 0.817726, 0.025579};
                 //Logistic:
                 //int weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
-                float score = 0.0;
+                float score = -0.301395;
                 score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
                 if(true_bubble){
                     score += weights[1];
