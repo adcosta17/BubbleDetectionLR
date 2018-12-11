@@ -36,9 +36,11 @@ int main(int argc, char** argv)
     bool coverage = false;
     bool mpa = false;
     bool binned = false;
-    int opt, iterations = 10, fuzz = 1000, threshold = 5;
+    bool use_ng50 = false;
+    bool collapse_contigs = false;
+    int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l")) != EOF)
     {
         switch(opt)
         {
@@ -52,6 +54,8 @@ int main(int argc, char** argv)
             case 'f': fuzz = atoi(optarg); break;
             case 't': threshold = atoi(optarg); break;
             case 'c': coverage_file = optarg; coverage = true; break;
+            case 'g': genome_size = atoi(optarg); use_ng50 = true; break;
+            case 'l': collapse_contigs = true; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -67,7 +71,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)";
         return 0;
     }
 
@@ -328,9 +332,6 @@ int main(int argc, char** argv)
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
-
-    std::ofstream n50Output;
-    n50Output.open(outputFileName+"_assembly_stats.txt");
 
     if(tax){
         cerr << "Taxonomy File Detected" << endl;
@@ -667,15 +668,27 @@ int main(int argc, char** argv)
     read_indegree.clear();
     read_outdegree.clear();
     MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-    MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours, read_coverage);
+
+    ofstream n50Output;
+    n50Output.open(outputFileName+"_assembly_stats.txt");
 
     for (int k = 0; k < n50_values.size(); k++)
     {
         n50Output << n50_values[k] << "\n"; 
     }
-    n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+    if(use_ng50){
+        n50Output << "Overall\t" << MatchUtils::compute_ng50(all_matches, read_indegree, read_outdegree, read_ids, genome_size) << "\n";
+    } else {
+        n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+    }
     n50Output.close();
-    
+
+    if(collapse_contigs){
+        MatchUtils::collapse_contigs(all_matches, read_indegree, read_outdegree, read_ids, colours, read_coverage, outputFileName+".gfa");
+    }
+    else {
+        MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours, read_coverage);
+    }
 
   	return 0;
 }

@@ -784,6 +784,212 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
     return string("") + to_string(n50) + "\t" + to_string(total_length) + "\t" + to_string(contig_lengths.size()) + "\t" + to_string(contig_lengths[0]);
 }
 
+void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, std::map<std::string, std::string>& colours, std::map<std::string, float>& read_coverage, std::string outputFileName){
+    using namespace std;
+
+    map<int, vector<Match> > contigs_sets;
+    int contig_num = 0;
+    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        // Look for nodes that have at least 2 valid neighbours, or are dead ends
+        // For each one we need to iterate over each neighbour and find path to next branch node
+        if(read_indegree[*it].size() >= 2 || read_outdegree[*it].size() >= 2 || (read_indegree[*it].size() == 0 && read_outdegree[*it].size() >= 1) || (read_outdegree[*it].size() == 0 && read_indegree[*it].size() >= 1)) {
+            contig_num = MatchUtils::compute_contigs(*it, all_matches, read_indegree, read_outdegree, contigs_sets, contig_num);
+        }
+    }
+    if(contig_num == 0){
+        // No contigs found
+        return;
+    }
+    map<int, int> contig_lengths;
+    // Now compute the length of each contig
+    for (map<int, vector<Match> >::iterator it = contigs_sets.begin(); it != contigs_sets.end(); ++it)
+    {
+        if(it->second.size() == 1){
+            if(it->second[0].length_to_use == 0){
+                continue;
+            }
+        }
+        int len = 0;
+        for (int i = 0; i < it->second.size(); ++i)
+        {
+            if(i == 0){
+                // Know that we must have at least two edges, otherwise they wouldn't be included here
+                if(it->second[i].length_to_use > 0){
+                    len = it->second[i].length_to_use;
+                    break;
+                }
+                else if(it->second[i].query_read_id == it->second[i+1].query_read_id || it->second[i].query_read_id == it->second[i+1].target_read_id){
+                    len = it->second[i].target_read_length;
+                } else {
+                    len = it->second[i].query_read_length;
+                }
+            }
+            len += it->second[i].length;
+        }
+        contig_lengths.insert(make_pair(it->first,len));
+    }
+    // Now need to collapse each contig and generate a set of overlaps between contigs
+    // First compute each contig start and end read
+    // Then compute the overlaps between contigs
+    // Finally output a list of contigs, their ids, lengths and overlaps between them to GFA file, with appropriate colours
+    map<int, vector<string> > contig_ends;
+    for (map<int, int>::iterator it = contig_lengths.begin(); it != contig_lengths.end(); ++it)
+    {
+        vector<string> tmp;
+        if(contigs_sets[it->first].size() == 1){
+            tmp.push_back(contigs_sets[it->first][0].query_read_id);
+            tmp.push_back(contigs_sets[it->first][0].target_read_id);
+            tmp.push_back(contigs_sets[it->first][0].target_read_id);
+            tmp.push_back(contigs_sets[it->first][0].query_read_id);
+            contig_ends.insert(make_pair(it->first, tmp));
+            continue;
+        }
+        if(contigs_sets[it->first][0].query_read_id == contigs_sets[it->first][1].query_read_id || contigs_sets[it->first][0].query_read_id == contigs_sets[it->first][1].target_read_id){
+            tmp.push_back(contigs_sets[it->first][0].target_read_id);
+            tmp.push_back(contigs_sets[it->first][0].query_read_id);
+        } else {
+            tmp.push_back(contigs_sets[it->first][0].query_read_id);
+            tmp.push_back(contigs_sets[it->first][0].target_read_id);
+        }
+        if(contigs_sets[it->first][contigs_sets[it->first].size()-1].query_read_id == contigs_sets[it->first][contigs_sets[it->first].size()-2].query_read_id || 
+            contigs_sets[it->first][contigs_sets[it->first].size()-1].query_read_id == contigs_sets[it->first][contigs_sets[it->first].size()-2].target_read_id){
+            tmp.push_back(contigs_sets[it->first][contigs_sets[it->first].size()-1].target_read_id);
+            tmp.push_back(contigs_sets[it->first][contigs_sets[it->first].size()-1].query_read_id);
+        } else {
+            tmp.push_back(contigs_sets[it->first][contigs_sets[it->first].size()-1].query_read_id);
+            tmp.push_back(contigs_sets[it->first][contigs_sets[it->first].size()-1].target_read_id);
+        }
+        contig_ends.insert(make_pair(it->first, tmp));
+    }
+
+    // Compute the colours of each contig based on the colours of the reads in it. Exclude grey. 
+    // Compute a set of colours. If only one colour in set at end then use it
+    // Otherwise use grey. If no colours in set use grey as well
+    map<int, string> contig_colours;
+    for (map<int, int>::iterator it = contig_lengths.begin(); it != contig_lengths.end(); ++it)
+    {
+        set<string> cols;
+        for(int i=0; i<contigs_sets[it->first].size(); i++){
+            if(colours[contigs_sets[it->first][i].query_read_id] != "#bebebe"){
+                cols.insert(colours[contigs_sets[it->first][i].query_read_id]);
+            }
+            if(colours[contigs_sets[it->first][i].target_read_id] != "#bebebe"){
+                cols.insert(colours[contigs_sets[it->first][i].target_read_id]);
+            }
+        }
+        if(cols.size() == 1){
+            contig_colours.insert(make_pair(it->first, *cols.begin()));
+        } else {
+            contig_colours.insert(make_pair(it->first, "#bebebe"));
+        }
+    }
+
+    // Now pull up actual overlaps between the start and ends of contigs.
+    // Map an overlap between two contigs pair<string, string> to a Match
+    // Then when outputing orient edge based on Match orientation as done before for reads
+    map<int, int> contig_matches;
+    for (map<int,vector<string> >::iterator it = contig_ends.begin(); it != contig_ends.end(); ++it)
+    {
+        for (map<int, vector<string>>::iterator it2 = contig_ends.begin(); it2 != contig_ends.end(); ++it2)
+        {
+            if(it->first <= it2->first){
+                continue;
+            }
+            // Check all four combinations of overlaps
+            if(it->second[0] == it2->second[0]){
+                // Now check if they are on same side, both come from the indegree side or both come from the outdegree side
+                // If so ignore, otherwise, edge
+                if(find(read_indegree[it->second[0]].begin(), read_indegree[it->second[0]].end(), it->second[1]) != read_indegree[it->second[0]].end() &&
+                    find(read_indegree[it->second[0]].begin(), read_indegree[it->second[0]].end(), it2->second[1]) != read_indegree[it->second[0]].end()){
+                    continue;
+                }
+                if(find(read_outdegree[it->second[0]].begin(), read_outdegree[it->second[0]].end(), it->second[1]) != read_outdegree[it->second[0]].end() &&
+                    find(read_outdegree[it->second[0]].begin(), read_outdegree[it->second[0]].end(), it2->second[1]) != read_outdegree[it->second[0]].end()){
+                    continue;
+                }
+                contig_matches.insert(make_pair(it->first, it2->first));
+            }
+        }
+    }
+
+    // Now just have to take contig lengths colours and overlaps and output to GFA
+}
+
+std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int genome_size){
+    // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
+    // Don't want to fully visualize as we need to see where each read comes from
+    // Last step of Layout phase in OLC
+    // Look for nodes that are branches. Iterate along each branch and add overlaps to list of edges against respective contig
+    // Keep going until we get to a node that is a branch, in either direction.
+
+    using namespace std;
+
+    map<int, vector<Match> > contigs_sets;
+    int contig_num = 0;
+    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    {
+        // Look for nodes that have at least 2 valid neighbours, or are dead ends
+        // For each one we need to iterate over each neighbour and find path to next branch node
+        if(read_indegree[*it].size() >= 2 || read_outdegree[*it].size() >= 2 || (read_indegree[*it].size() == 0 && read_outdegree[*it].size() >= 1) || (read_outdegree[*it].size() == 0 && read_indegree[*it].size() >= 1)) {
+            contig_num = MatchUtils::compute_contigs(*it, all_matches, read_indegree, read_outdegree, contigs_sets, contig_num);
+        }
+    }
+    if(contig_num == 0){
+        // No contigs found
+        return "";
+    }
+    vector<int> contig_lengths;
+    int total_length = 0;
+    // Now compute the length of each contig
+    for (map<int, vector<Match> >::iterator it = contigs_sets.begin(); it != contigs_sets.end(); ++it)
+    {
+        if(it->second.size() == 1){
+            if(it->second[0].length_to_use == 0){
+                continue;
+            }
+        }
+        int len = 0;
+        for (int i = 0; i < it->second.size(); ++i)
+        {
+            if(i == 0){
+                // Know that we must have at least two edges, otherwise they wouldn't be included here
+                if(it->second[i].length_to_use > 0){
+                    len = it->second[i].length_to_use;
+                    break;
+                }
+                else if(it->second[i].query_read_id == it->second[i+1].query_read_id || it->second[i].query_read_id == it->second[i+1].target_read_id){
+                    len = it->second[i].target_read_length;
+                } else {
+                    len = it->second[i].query_read_length;
+                }
+            }
+            len += it->second[i].length;
+        }
+        if(it->second.size() > 1){
+            //cerr << "Contig Between: " << len << " " << it->second[0].query_read_id << " : " << it->second[0].target_read_id << " and " << it->second[it->second.size() -1].query_read_id << " : " << it->second[it->second.size() -1].target_read_id << endl;
+        }
+        contig_lengths.push_back(len);
+        total_length += len;
+    }
+
+    // Compute N50 and report number of contigs and total length
+    sort(contig_lengths.begin(), contig_lengths.end(), greater<int>());
+    int ng50 = 0;
+    int sum_len = 0;
+    for (int i = 0; i < contig_lengths.size(); ++i)
+    {
+        sum_len += contig_lengths[i];
+        //cout << sum_len << " " << contig_lengths[i] << " " << total_length << " " << sum_len/float(total_length) << endl;
+        if(sum_len/float(genome_size) > 0.5){
+            ng50 = contig_lengths[i];
+            break;
+        }
+    }
+
+    return string("") + to_string(ng50) + "\t" + to_string(total_length) + "\t" + to_string(contig_lengths.size()) + "\t" + to_string(contig_lengths[0]);
+}
+
 
 void MatchUtils::subset_matches(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& species_matches, std::map<std::string, std::vector<Match> >&  species_edge_lists, std::set<std::string> ids_to_use){
     for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it)
