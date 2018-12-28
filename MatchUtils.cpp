@@ -184,7 +184,6 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
 	cerr << "Found " << paf_files.size() << " Paf Files" << endl;
 
 	// Take the list of paf_files and then for each of them read in the file
-	cerr << "Caculating Contained Reads" << endl;
 	int count = 0;
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
 
@@ -195,6 +194,7 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
         cerr << "Assembling " << name << endl;
         set<string> to_drop;
         set<string> tmp_read_ids;
+        cerr << "\tCaculating Contained Reads" << endl;
 		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
 		count++;
 		
@@ -205,6 +205,7 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
         map<string, vector<Match>> tmp_raw_matches;
         map<string, vector<string> > read_indegree;
         map<string, vector<string> > read_outdegree;
+        cerr << "\tReading in overlaps" << endl;
 		vector<int> sizes = get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
         if(sizes.size() == 0){
             continue;
@@ -784,6 +785,19 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
     return string("") + to_string(n50) + "\t" + to_string(total_length) + "\t" + to_string(contig_lengths.size()) + "\t" + to_string(contig_lengths[0]);
 }
 
+bool add_overlap(std::vector<std::string>& rin, std::vector<std::string>& rout, std::string target1, std::string target2){
+    if(find(rin.begin(), rin.end(), target1) != rin.end() &&
+        find(rin.begin(), rin.end(), target2) != rin.end()){
+            return false;
+    }
+    if(find(rout.begin(), rout.end(), target1) != rout.end() &&
+        find(rout.begin(), rout.end(), target2) != rout.end()){
+            return false;
+    }
+    return true;
+}
+
+
 void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, std::map<std::string, std::string>& colours, std::map<std::string, float>& read_coverage, std::string outputFileName){
     using namespace std;
 
@@ -801,6 +815,7 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
         // No contigs found
         return;
     }
+    cerr << "Found " << contig_num << " contigs" << endl;
     map<int, int> contig_lengths;
     // Now compute the length of each contig
     for (map<int, vector<Match> >::iterator it = contigs_sets.begin(); it != contigs_sets.end(); ++it)
@@ -829,6 +844,7 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
         }
         contig_lengths.insert(make_pair(it->first,len));
     }
+    cerr << "Computed contig lengths" << endl;
     // Now need to collapse each contig and generate a set of overlaps between contigs
     // First compute each contig start and end read
     // Then compute the overlaps between contigs
@@ -862,29 +878,33 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
         }
         contig_ends.insert(make_pair(it->first, tmp));
     }
-
+    cerr << "Computed contig ends" << endl;
     // Compute the colours of each contig based on the colours of the reads in it. Exclude grey. 
     // Compute a set of colours. If only one colour in set at end then use it
     // Otherwise use grey. If no colours in set use grey as well
     map<int, string> contig_colours;
     for (map<int, int>::iterator it = contig_lengths.begin(); it != contig_lengths.end(); ++it)
     {
-        set<string> cols;
-        for(int i=0; i<contigs_sets[it->first].size(); i++){
-            if(colours[contigs_sets[it->first][i].query_read_id] != "#bebebe"){
-                cols.insert(colours[contigs_sets[it->first][i].query_read_id]);
+        if(colours.size() > 0){
+            set<string> cols;
+            for(int i=0; i<contigs_sets[it->first].size(); i++){
+                if(colours[contigs_sets[it->first][i].query_read_id] != "#bebebe"){
+                    cols.insert(colours[contigs_sets[it->first][i].query_read_id]);
+                }
+                if(colours[contigs_sets[it->first][i].target_read_id] != "#bebebe"){
+                    cols.insert(colours[contigs_sets[it->first][i].target_read_id]);
+                }
             }
-            if(colours[contigs_sets[it->first][i].target_read_id] != "#bebebe"){
-                cols.insert(colours[contigs_sets[it->first][i].target_read_id]);
+            if(cols.size() == 1){
+                contig_colours.insert(make_pair(it->first, *cols.begin()));
+            } else {
+                contig_colours.insert(make_pair(it->first, "#bebebe"));
             }
-        }
-        if(cols.size() == 1){
-            contig_colours.insert(make_pair(it->first, *cols.begin()));
         } else {
             contig_colours.insert(make_pair(it->first, "#bebebe"));
         }
     }
-
+    cerr << "Computed contig colours" << endl;
     // Now pull up actual overlaps between the start and ends of contigs.
     // Map an overlap between two contigs pair<string, string> to a Match
     // Then when outputing orient edge based on Match orientation as done before for reads
@@ -896,24 +916,115 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
             if(it->first <= it2->first){
                 continue;
             }
-            // Check all four combinations of overlaps
-            if(it->second[0] == it2->second[0]){
-                // Now check if they are on same side, both come from the indegree side or both come from the outdegree side
-                // If so ignore, otherwise, edge
-                if(find(read_indegree[it->second[0]].begin(), read_indegree[it->second[0]].end(), it->second[1]) != read_indegree[it->second[0]].end() &&
-                    find(read_indegree[it->second[0]].begin(), read_indegree[it->second[0]].end(), it2->second[1]) != read_indegree[it->second[0]].end()){
-                    continue;
-                }
-                if(find(read_outdegree[it->second[0]].begin(), read_outdegree[it->second[0]].end(), it->second[1]) != read_outdegree[it->second[0]].end() &&
-                    find(read_outdegree[it->second[0]].begin(), read_outdegree[it->second[0]].end(), it2->second[1]) != read_outdegree[it->second[0]].end()){
-                    continue;
-                }
+            bool it_single_overlap = false;
+            bool it2_single_overlap = false;
+            if(it->second[0] == it->second[3] || it->second[0] == it->second[2] || it->second[1] == it->second[2] || it->second[1] == it->second[3]){
+                it_single_overlap = true;
+            }
+            if(it2->second[0] == it2->second[3] || it2->second[0] == it2->second[2] || it2->second[1] == it2->second[2] || it2->second[1] == it2->second[3]){
+                it2_single_overlap = true;
+            }
+            // Check all 16 combinations of overlaps
+            if(it->second[0] == it2->second[0] && add_overlap(read_indegree[it->second[0]], read_outdegree[it->second[0]], it->second[1], it2->second[1])){
                 contig_matches.insert(make_pair(it->first, it2->first));
+                cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[0] << " " << it->second[1] << " " << it2->second[1] << endl;
+            }
+            if(it->second[0] == it2->second[1] && add_overlap(read_indegree[it->second[0]], read_outdegree[it->second[0]], it->second[1], it2->second[0])){
+                contig_matches.insert(make_pair(it->first, it2->first));
+                cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[0] << " " << it->second[1] << " " << it2->second[0] << endl;
+            }
+            if(it->second[1] == it2->second[0] && add_overlap(read_indegree[it->second[1]], read_outdegree[it->second[1]], it->second[0], it2->second[1])){
+                contig_matches.insert(make_pair(it->first, it2->first));
+                cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[1] << " " << it->second[0] << " " << it2->second[1] << endl;
+            }
+            if(it->second[1] == it2->second[1] && add_overlap(read_indegree[it->second[1]], read_outdegree[it->second[1]], it->second[0], it2->second[0])){
+                contig_matches.insert(make_pair(it->first, it2->first));
+                cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[1] << " " << it->second[0] << " " << it2->second[0] << endl;
+            }
+            if(!it2_single_overlap){
+                if(it->second[0] == it2->second[2] && add_overlap(read_indegree[it->second[0]], read_outdegree[it->second[0]], it->second[1], it2->second[3])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[0] << " " << it->second[1] << " " << it2->second[3] << endl;
+                }
+                if(it->second[0] == it2->second[3] && add_overlap(read_indegree[it->second[0]], read_outdegree[it->second[0]], it->second[1], it2->second[2])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[0] << " " << it->second[1] << " " << it2->second[2] << endl;
+                }
+                if(it->second[1] == it2->second[2] && add_overlap(read_indegree[it->second[1]], read_outdegree[it->second[1]], it->second[0], it2->second[3])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[1] << " " << it->second[0] << " " << it2->second[3] << endl;
+                }
+                if(it->second[1] == it2->second[3] && add_overlap(read_indegree[it->second[1]], read_outdegree[it->second[1]], it->second[0], it2->second[2])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[1] << " " << it->second[0] << " " << it2->second[2] << endl;
+                }
+            }
+            if(!it_single_overlap){
+                if(it->second[2] == it2->second[0] && add_overlap(read_indegree[it->second[2]], read_outdegree[it->second[2]], it->second[3], it2->second[1])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[2] << " " << it->second[3] << " " << it2->second[1] << endl;
+                }
+                if(it->second[2] == it2->second[1] && add_overlap(read_indegree[it->second[2]], read_outdegree[it->second[2]], it->second[3], it2->second[0])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[2] << " " << it->second[3] << " " << it2->second[0] << endl;
+                }
+                if(it->second[3] == it2->second[0] && add_overlap(read_indegree[it->second[3]], read_outdegree[it->second[3]], it->second[2], it2->second[1])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[3] << " " << it->second[2] << " " << it2->second[1] << endl;
+                }
+                if(it->second[3] == it2->second[1] && add_overlap(read_indegree[it->second[3]], read_outdegree[it->second[3]], it->second[2], it2->second[0])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[3] << " " << it->second[2] << " " << it2->second[0] << endl;
+                }
+            }
+            if(!it_single_overlap && !it2_single_overlap){
+                if(it->second[2] == it2->second[2] && add_overlap(read_indegree[it->second[2]], read_outdegree[it->second[2]], it->second[3], it2->second[3])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[2] << " " << it->second[3] << " " << it2->second[3] << endl;
+                }
+                if(it->second[2] == it2->second[3] && add_overlap(read_indegree[it->second[2]], read_outdegree[it->second[2]], it->second[3], it2->second[2])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[2] << " " << it->second[3] << " " << it2->second[2] << endl;
+                }
+                if(it->second[3] == it2->second[2] && add_overlap(read_indegree[it->second[3]], read_outdegree[it->second[3]], it->second[2], it2->second[3])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[3] << " " << it->second[2] << " " << it2->second[3] << endl;
+                }
+                if(it->second[3] == it2->second[3] && add_overlap(read_indegree[it->second[3]], read_outdegree[it->second[3]], it->second[2], it2->second[2])){
+                    contig_matches.insert(make_pair(it->first, it2->first));
+                    cerr << "Adding Edge between " << it->first << " " << it2->first << " " << it->second[3] << " " << it->second[2] << " " << it2->second[2] << endl;
+                }
             }
         }
     }
+    cerr << "Computed contig overlaps" << endl;
+    contig_ends.clear();
 
+    map<int, float> contig_cov;
+    for (map<int, int>::iterator it = contig_lengths.begin(); it != contig_lengths.end(); ++it)
+    {
+        float tmp = 0;
+        for (int i = 0; i < contigs_sets[it->first].size(); ++i)
+        {
+            tmp += contigs_sets[it->first][i].length * read_coverage[contigs_sets[it->first][i].query_read_id] * 0.5;
+            tmp += contigs_sets[it->first][i].length * read_coverage[contigs_sets[it->first][i].target_read_id] * 0.5;
+        }
+        contig_cov.insert(make_pair(it->first, tmp/it->second));
+    }
+    // know there should only be two arms
+    cerr << "Output as GFA" << endl;
     // Now just have to take contig lengths colours and overlaps and output to GFA
+    ofstream gfaOutput;
+    gfaOutput.open(outputFileName);
+    gfaOutput << "H\tVN:Z:Collapsed\n";
+    for (map<int, int>::iterator it=contig_lengths.begin(); it!=contig_lengths.end(); ++it){
+        gfaOutput << "S\t" << it->first <<"\t*\tLN:i:" << it->second << "\tKC:i:"<< static_cast<int>(it->second*contig_cov[it->first]) << "\tCL:z:" << contig_colours[it->first] << "\tC2:z:" << contig_colours[it->first] << "\n";
+    }
+    for (map<int, int>::iterator it = contig_matches.begin(); it != contig_matches.end(); ++it)
+    {
+        gfaOutput << "L\t" << it->first << "\t+\t" << it->second << "\t+\t\n";
+    }
+    gfaOutput.close();
 }
 
 std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int genome_size){

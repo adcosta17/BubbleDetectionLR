@@ -40,7 +40,7 @@ int main(int argc, char** argv)
     bool collapse_contigs = false;
     int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:")) != EOF)
     {
         switch(opt)
         {
@@ -683,13 +683,13 @@ int main(int argc, char** argv)
     }
     n50Output.close();
 
-    if(collapse_contigs){
-        MatchUtils::collapse_contigs(all_matches, read_indegree, read_outdegree, read_ids, colours, read_coverage, outputFileName+".gfa");
-    }
-    else {
-        MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours, read_coverage);
-    }
+    MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours, read_coverage);
 
+    if(collapse_contigs){
+        cerr << "Collapsing overlaps to Contigs" << endl;
+        MatchUtils::collapse_contigs(all_matches, read_indegree, read_outdegree, read_ids, colours, read_coverage, outputFileName+"_collapsed.gfa");
+    }
+    cerr << "Done" << endl;
   	return 0;
 }
 
