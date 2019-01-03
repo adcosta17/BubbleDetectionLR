@@ -71,7 +71,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)\n";
         return 0;
     }
 
@@ -308,7 +308,7 @@ int main(int argc, char** argv)
             MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
             // Prune Dead End Reads
             MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
-            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, 2);
+            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
             MatchUtils::clean_matches(all_matches);
         }
         cerr << "\tRemoved " << rm_edge << " Edges" << endl;
@@ -660,7 +660,7 @@ int main(int argc, char** argv)
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
         // Prune Dead End Reads
         MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
-        rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, 2);
+        rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
         MatchUtils::clean_matches(all_matches);
     }
     cerr << "\tRemoved " << rm_edge << " Edges" << endl;
