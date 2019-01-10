@@ -318,7 +318,7 @@ int main(int argc, char** argv)
 
     } else if(is_dir(pafFile.c_str())){
         cerr << "Parsing Paf Input Directory" << endl;
-        MatchUtils::read_and_assemble_paf_dir(all_matches, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations);
+        mean_read_length = MatchUtils::read_and_assemble_paf_dir(all_matches, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold);
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
@@ -677,9 +677,9 @@ int main(int argc, char** argv)
         n50Output << n50_values[k] << "\n"; 
     }
     if(use_ng50){
-        n50Output << "Overall\t" << MatchUtils::compute_ng50(all_matches, read_indegree, read_outdegree, read_ids, genome_size) << "\n";
+        n50Output << "Overall\t" << MatchUtils::compute_ng50(all_matches, read_indegree, read_outdegree, read_ids, genome_size, 2*mean_read_length) << "\n";
     } else {
-        n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids) << "\n";
+        n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids, 2*mean_read_length) << "\n";
     }
     n50Output.close();
 
@@ -687,7 +687,7 @@ int main(int argc, char** argv)
 
     if(collapse_contigs){
         cerr << "Collapsing overlaps to Contigs" << endl;
-        MatchUtils::collapse_contigs(all_matches, read_indegree, read_outdegree, read_ids, colours, read_coverage, outputFileName+"_collapsed.gfa");
+        MatchUtils::collapse_contigs(all_matches, read_indegree, read_outdegree, read_ids, colours, read_coverage, outputFileName+"_collapsed.gfa", 2*mean_read_length);
     }
     cerr << "Done" << endl;
   	return 0;

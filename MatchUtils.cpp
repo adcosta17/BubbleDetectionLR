@@ -159,7 +159,7 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
     return sizes;
 }
 
-void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations){
+int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold){
 	using namespace std;
 	set<string> paf_files;
 	DIR *dir;
@@ -179,45 +179,49 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
 	} else {
 	  /* could not open directory */
 	  cerr << "ERROR: Could not open " << file_name << endl; 
-	  return;
+	  return 0;
 	}
 	cerr << "Found " << paf_files.size() << " Paf Files" << endl;
 
 	// Take the list of paf_files and then for each of them read in the file
-	int count = 0;
+    vector<int> average_read_lens;
+    vector<int> total_reads;
+    set<string> to_drop;
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+        set<string> tmp_read_ids;
+        string tmp = *it;
+        cerr << "Caculating Contained Reads" << endl;
+		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
 
+    }
+
+    map<string, vector<Match>> edge_lists;
+    map<string, vector<string> > read_indegree;
+    map<string, vector<string> > read_outdegree;
+    for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         // get species name
         string tmp = *it;
         size_t found = tmp.find_last_of("/");
         string name(tmp.substr(found+1).substr(0,tmp.substr(found+1).size()-11));
         cerr << "Assembling " << name << endl;
-        set<string> to_drop;
         set<string> tmp_read_ids;
-        cerr << "\tCaculating Contained Reads" << endl;
-		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
-		count++;
-		
-        tmp_read_ids.clear();
-
-        map<string, vector<Match>> tmp_edge_lists;
-        map<string, vector<Match>> tmp_all_matches;
         map<string, vector<Match>> tmp_raw_matches;
-        map<string, vector<string> > read_indegree;
-        map<string, vector<string> > read_outdegree;
         cerr << "\tReading in overlaps" << endl;
-		vector<int> sizes = get_all_matches_for_file(tmp_edge_lists, tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
+		vector<int> sizes = get_all_matches_for_file(edge_lists, all_matches, tmp_raw_matches, read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
         if(sizes.size() == 0){
             continue;
         }
         int mean_read_length = accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
+        total_reads.push_back(sizes.size());
+        average_read_lens.push_back(mean_read_length);
 
-        reduce_edges(tmp_all_matches, tmp_read_ids, tmp_edge_lists, fuzz);
+        // Reduce the edges of the combined all_matches set
+        reduce_edges(all_matches, read_ids, edge_lists, fuzz);
         read_indegree.clear();
         read_outdegree.clear();
-        compute_in_out_degree(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree);
+        compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
         cerr << "\tDropping Reduced Edges" << endl;
-        MatchUtils::clean_matches(tmp_all_matches);
+        MatchUtils::clean_matches(all_matches);
         cerr << "\tPruning Dead Ends" << endl;
         int rm_edge = 0;
         for (int j = 0; j < iterations; ++j)
@@ -226,68 +230,28 @@ void MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Mat
             map<string, vector<string> > de_paths;
             read_indegree.clear();
             read_outdegree.clear();
-            MatchUtils::compute_in_out_degree(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree);
+            MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
             // Prune Dead End Reads
-            MatchUtils::compute_dead_ends(tmp_all_matches, tmp_read_ids,read_indegree, read_outdegree, de_ids, de_paths);
-            rm_edge += MatchUtils::prune_dead_paths(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, 5);
-            MatchUtils::clean_matches(tmp_all_matches);
+            MatchUtils::compute_dead_ends(all_matches, read_ids, read_indegree, read_outdegree, de_ids, de_paths);
+            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
+            MatchUtils::clean_matches(all_matches);
         }
         cerr << "\tRemoved " << rm_edge << " Edges" << endl;
         read_indegree.clear();
         read_outdegree.clear();
-        MatchUtils::compute_in_out_degree(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree);
-
-        string n50_val = MatchUtils::compute_n50(tmp_all_matches, read_indegree, read_outdegree, tmp_read_ids);
-        if(n50_val != ""){
-            n50_values.push_back(name + "\n" + n50_val);
-        }
-
-        for (set<string>::iterator it2=tmp_read_ids.begin(); it2!=tmp_read_ids.end(); ++it2){
-            if(read_outdegree[*it2].size() > 0 || read_indegree[*it2].size() > 0){
-                // Read is in connected componenet, add to set to drop
-                read_ids.insert(*it2);
-            }
-        }
-
-        // Then we also need to take the overlaps for this species and add it to the master set of overalps to look at that are valid
-        // This valid set is what we will call bubbles on
-        for (map<string, vector<Match> >::iterator it2 = tmp_all_matches.begin(); it2 != tmp_all_matches.end(); ++it2)
-        {
-            if(all_matches.count(it2->first) == 0){
-                vector<Match> tmp;
-                all_matches.insert(pair<string, vector<Match> >(it2->first,tmp));
-            }
-            for (int j = 0; j < it2->second.size(); ++j)
-            {
-                if(!it2->second[j].reduce){
-                    // Check if edge is already in ourset of graph edges, Don't want duplicates
-                    // Check the set indexed by the query read and then the target
-                    bool found = false;
-                    if(all_matches.count(it2->second[j].query_read_id) != 0){
-                        for(int k = 0; k < all_matches[it2->second[j].query_read_id].size(); k++){
-                            if((all_matches[it2->second[j].query_read_id][k].query_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].query_read_id][k].target_read_id == it2->second[j].target_read_id) ||
-                                (all_matches[it2->second[j].query_read_id][k].target_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].query_read_id][k].query_read_id == it2->second[j].target_read_id)){
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                    if(!found && all_matches.count(it2->second[j].target_read_id) != 0){
-                        for(int k = 0; k < all_matches[it2->second[j].target_read_id].size(); k++){
-                            if((all_matches[it2->second[j].target_read_id][k].query_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].target_read_id][k].target_read_id == it2->second[j].target_read_id) ||
-                                (all_matches[it2->second[j].target_read_id][k].target_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].target_read_id][k].query_read_id == it2->second[j].target_read_id)){
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                    if(!found){
-                        all_matches[it2->first].push_back(it2->second[j]);
-                    }
-                }
-            }
-        }
+        MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
 	}
+
+    if(average_read_lens.size() > 0){
+        int n = accumulate( total_reads.begin(), total_reads.end(), 0);
+        int to_ret = 0;
+        for(int i = 0; i < average_read_lens.size(); i++){
+            to_ret += average_read_lens[i] * static_cast<float>(total_reads[i])/n;
+        }
+        return to_ret;
+    }
+
+    return 0;
 }
 
 int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
@@ -711,7 +675,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     return ratio_cov;
 }
 
-std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids){
+std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int threshold){
     // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
     // Don't want to fully visualize as we need to see where each read comes from
     // Last step of Layout phase in OLC
@@ -761,8 +725,11 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
                 len += it->second[i].length;
             }
         }
-        contig_lengths.push_back(len);
-        total_length += len;
+        // Want to have a filter on contig lengths. Don't include contigs that are smaller than the threshold
+        if(len >= threshold){
+            contig_lengths.push_back(len);
+            total_length += len;
+        }
     }
 
     // Compute N50 and report number of contigs and total length
@@ -803,7 +770,7 @@ bool overlap_orientation(std::vector<std::string>& rin, std::vector<std::string>
 }
 
 
-void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, std::map<std::string, std::string>& colours, std::map<std::string, float>& read_coverage, std::string outputFileName){
+void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, std::map<std::string, std::string>& colours, std::map<std::string, float>& read_coverage, std::string outputFileName, int threshold){
     using namespace std;
 
     map<int, vector<Match> > contigs_sets;
@@ -846,7 +813,9 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
                 len += it->second[i].length;
             }
         }
-        contig_lengths.insert(make_pair(it->first,len));
+        if(len >= threshold){
+            contig_lengths.insert(make_pair(it->first,len));
+        }
     }
     cerr << "Computed contig lengths" << endl;
     // Now need to collapse each contig and generate a set of overlaps between contigs
@@ -1124,7 +1093,7 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
     gfaOutput.close();
 }
 
-std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int genome_size){
+std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int genome_size, int threshold){
     // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
     // Don't want to fully visualize as we need to see where each read comes from
     // Last step of Layout phase in OLC
@@ -1174,8 +1143,10 @@ std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >&
                 len += it->second[i].length;
             }
         }
-        contig_lengths.push_back(len);
-        total_length += len;
+        if(len >= threshold){
+            contig_lengths.push_back(len);
+            total_length += len;
+        }
     }
 
     // Compute N50 and report number of contigs and total length
