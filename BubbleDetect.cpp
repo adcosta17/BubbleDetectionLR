@@ -38,9 +38,10 @@ int main(int argc, char** argv)
     bool binned = false;
     bool use_ng50 = false;
     bool collapse_contigs = false;
+    bool is_binned = false;
     int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:")) != EOF)
     {
         switch(opt)
         {
@@ -56,6 +57,7 @@ int main(int argc, char** argv)
             case 'c': coverage_file = optarg; coverage = true; break;
             case 'g': genome_size = atoi(optarg); use_ng50 = true; break;
             case 'l': collapse_contigs = true; break;
+            case 'b': is_binned = true; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -103,7 +105,6 @@ int main(int argc, char** argv)
             if(classification == "Chimeric"){
                 chimeric_reads.insert(id);
             }
-            //cout << id << endl;
         }
     }
     
@@ -195,8 +196,6 @@ int main(int argc, char** argv)
                     {
                         per_species_coverage[it->first] += it2->second/num_bases[it->first];
                     }
-                    //cerr << it->first << " " << num_bases[it->first] << endl;
-                    //cerr << it->first << " " << per_species_coverage[it->first] << endl;
                 }
             }
         } else if(is_dir(coverage_file.c_str())){
@@ -316,6 +315,12 @@ int main(int argc, char** argv)
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
 
+    } else if(is_dir(pafFile.c_str()) && is_binned){
+        cerr << "Parsing Paf Input Directory" << endl;
+        mean_read_length = MatchUtils::read_and_assemble_paf_dir_binned(all_matches, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold);
+        read_indegree.clear();
+        read_outdegree.clear();
+        MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
     } else if(is_dir(pafFile.c_str())){
         cerr << "Parsing Paf Input Directory" << endl;
         mean_read_length = MatchUtils::read_and_assemble_paf_dir(all_matches, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold);
