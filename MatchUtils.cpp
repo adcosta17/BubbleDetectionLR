@@ -159,7 +159,7 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
     return sizes;
 }
 
-void MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations){
+int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold){
     using namespace std;
     set<string> paf_files;
     DIR *dir;
@@ -179,18 +179,20 @@ void MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vec
     } else {
       /* could not open directory */
       cerr << "ERROR: Could not open " << file_name << endl; 
-      return;
+      return 0;
     }
     cerr << "Found " << paf_files.size() << " Paf Files" << endl;
 
+    vector<int> average_read_lens;
+    vector<int> total_reads;
     set<string> to_drop;
     // Take the list of paf_files and then for each of them read in the file
+    cerr << "Caculating Contained Reads" << endl;
     for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
 
         // get species name
         string tmp = *it;
         set<string> tmp_read_ids;
-        cerr << "Caculating Contained Reads" << endl;
         get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
         
     }
@@ -212,6 +214,8 @@ void MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vec
             continue;
         }
         int mean_read_length = accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
+        total_reads.push_back(sizes.size());
+        average_read_lens.push_back(mean_read_length);
 
         reduce_edges(tmp_all_matches, tmp_read_ids, tmp_edge_lists, fuzz);
         read_indegree.clear();
@@ -230,7 +234,7 @@ void MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vec
             MatchUtils::compute_in_out_degree(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree);
             // Prune Dead End Reads
             MatchUtils::compute_dead_ends(tmp_all_matches, tmp_read_ids,read_indegree, read_outdegree, de_ids, de_paths);
-            rm_edge += MatchUtils::prune_dead_paths(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, 5);
+            rm_edge += MatchUtils::prune_dead_paths(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
             MatchUtils::clean_matches(tmp_all_matches);
         }
         cerr << "\tRemoved " << rm_edge << " Edges" << endl;
@@ -238,7 +242,7 @@ void MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vec
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree);
 
-        string n50_val = MatchUtils::compute_n50(tmp_all_matches, read_indegree, read_outdegree, tmp_read_ids);
+        string n50_val = MatchUtils::compute_n50(tmp_all_matches, read_indegree, read_outdegree, tmp_read_ids, threshold);
         if(n50_val != ""){
             n50_values.push_back(name + "\n" + n50_val);
         }
@@ -289,6 +293,17 @@ void MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vec
             }
         }
     }
+
+    if(average_read_lens.size() > 0){
+        int n = accumulate( total_reads.begin(), total_reads.end(), 0);
+        int to_ret = 0;
+        for(int i = 0; i < average_read_lens.size(); i++){
+            to_ret += average_read_lens[i] * static_cast<float>(total_reads[i])/n;
+        }
+        return to_ret;
+    }
+
+    return 0;
 }
 
 
@@ -321,10 +336,10 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
     vector<int> average_read_lens;
     vector<int> total_reads;
     set<string> to_drop;
+    cerr << "Caculating Contained Reads" << endl;
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         set<string> tmp_read_ids;
         string tmp = *it;
-        cerr << "Caculating Contained Reads" << endl;
 		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
 
     }
@@ -332,6 +347,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
     map<string, vector<Match>> edge_lists;
     map<string, vector<string> > read_indegree;
     map<string, vector<string> > read_outdegree;
+    int mean_read_length = 0;
     for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         // get species name
         string tmp = *it;
@@ -345,36 +361,10 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
         if(sizes.size() == 0){
             continue;
         }
-        int mean_read_length = accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
+        mean_read_length = accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
         total_reads.push_back(sizes.size());
         average_read_lens.push_back(mean_read_length);
-
-        // Reduce the edges of the combined all_matches set
-        reduce_edges(all_matches, read_ids, edge_lists, fuzz);
-        read_indegree.clear();
-        read_outdegree.clear();
-        compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-        cerr << "\tDropping Reduced Edges" << endl;
-        MatchUtils::clean_matches(all_matches);
-        cerr << "\tPruning Dead Ends" << endl;
-        int rm_edge = 0;
-        for (int j = 0; j < iterations; ++j)
-        {
-            set<string> de_ids;
-            map<string, vector<string> > de_paths;
-            read_indegree.clear();
-            read_outdegree.clear();
-            MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-            // Prune Dead End Reads
-            MatchUtils::compute_dead_ends(all_matches, read_ids, read_indegree, read_outdegree, de_ids, de_paths);
-            rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
-            MatchUtils::clean_matches(all_matches);
-        }
-        cerr << "\tRemoved " << rm_edge << " Edges" << endl;
-        read_indegree.clear();
-        read_outdegree.clear();
-        MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-	}
+    }
 
     if(average_read_lens.size() > 0){
         int n = accumulate( total_reads.begin(), total_reads.end(), 0);
@@ -382,10 +372,37 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
         for(int i = 0; i < average_read_lens.size(); i++){
             to_ret += average_read_lens[i] * static_cast<float>(total_reads[i])/n;
         }
-        return to_ret;
+        mean_read_length = to_ret;
     }
 
-    return 0;
+    // Reduce the edges of the combined all_matches set
+    reduce_edges(all_matches, read_ids, edge_lists, fuzz);
+    read_indegree.clear();
+    read_outdegree.clear();
+    compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+    cerr << "\tDropping Reduced Edges" << endl;
+    MatchUtils::clean_matches(all_matches);
+    cerr << "\tPruning Dead Ends" << endl;
+    int rm_edge = 0;
+    for (int j = 0; j < iterations; ++j)
+    {
+        set<string> de_ids;
+        map<string, vector<string> > de_paths;
+        read_indegree.clear();
+        read_outdegree.clear();
+        MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+        // Prune Dead End Reads
+        MatchUtils::compute_dead_ends(all_matches, read_ids, read_indegree, read_outdegree, de_ids, de_paths);
+        rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
+        MatchUtils::clean_matches(all_matches);
+    }
+    cerr << "\tRemoved " << rm_edge << " Edges" << endl;
+    read_indegree.clear();
+    read_outdegree.clear();
+    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
+
+
+    return mean_read_length;
 }
 
 int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
