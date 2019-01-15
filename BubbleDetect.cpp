@@ -80,7 +80,6 @@ int main(int argc, char** argv)
     // Read in and Parse input file
 	map<string, vector<Match> > all_matches;
     map<string, vector<Match> > raw_matches;
-    map<string, vector<Match> > edge_lists;
     set<string> read_ids;
     map<string, int> read_lengths;
     set<string> chimeric_reads;
@@ -283,12 +282,12 @@ int main(int argc, char** argv)
         return 0;
     } else if(is_file(pafFile.c_str())){
         cerr << "Parsing Paf Input File" << endl;
-        mean_read_length = MatchUtils::read_paf_file(edge_lists, all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, false);
+        mean_read_length = MatchUtils::read_paf_file(all_matches, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, false);
         cerr << read_ids.size() << " Unique Reads found in File"<< endl;
         cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
         // Myers Transitive Reduction Alg
         cerr << "Reducing Edges" << endl;
-        MatchUtils::reduce_edges(all_matches, read_ids, edge_lists, fuzz);
+        MatchUtils::reduce_edges(all_matches, read_ids, fuzz);
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
