@@ -1,4 +1,4 @@
-all: BubbleDetect PafSubset ReadClassificationGen SplitFastq CombinePaf
+all: BubbleDetect PafSubset ReadClassificationGen SplitFastq CombinePaf ComputeContained ProcessBubbleList ReadCoverageCombined FilterContained
 
 BubbleDetect: BubbleDetect.cpp Match.hpp Match.cpp MatchUtils.cpp MatchUtils.hpp Read.cpp Read.hpp
 	g++ -g -std=c++11 -lboost_iostreams BubbleDetect.cpp Match.cpp MatchUtils.cpp Read.cpp -o BubbleDetect
@@ -15,5 +15,17 @@ SplitFastq: SplitFastq.cpp Read.cpp
 CombinePaf: CombinePaf.cpp
 	g++ -g -std=c++11 -lboost_iostreams CombinePaf.cpp -lm -lz -o CombinePaf
 
+ComputeContained: ComputeContained.cpp
+	g++ -g -std=c++11 -lboost_iostreams ComputeContained.cpp Match.cpp -lm -lz -o ComputeContained 
+
+ProcessBubbleList: ProcessBubbleList.cpp
+	g++ -g -std=c++11 ProcessBubbleList.cpp -o ProcessBubbleList
+
+ReadCoverageCombined: ReadCoverageCombined.cpp
+	g++ -g -std=c++11 -lboost_iostreams ReadCoverageCombined.cpp -lm -lz -o ReadCoverageCombined
+
+FilterContained: FilterContained.cpp
+	g++ -g -std=c++11 -lboost_iostreams FilterContained.cpp -lm -lz -o FilterContained
+
 clean:
-	rm BubbleDetect PafSubset ReadClassificationGen SplitFastq
+	rm BubbleDetect PafSubset ReadClassificationGen SplitFastq CombinePaf ComputeContained ProcessBubbleList ReadCoverageCombined FilterContained
