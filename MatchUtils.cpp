@@ -17,6 +17,65 @@ namespace io = boost::iostreams;
 
 #include "MatchUtils.hpp"
 
+int char_to_hex_int[103] = {
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,1,
+    2,3,4,5,6,7,8,9,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,10,11,12,
+    13,14,15};
+
+std::string hex_int_string_to_char_string[16] = {
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
+
+std::string MatchUtils::get_hex_string(std::string& str){
+    // Convert ReadId to ACSII represented HexString
+    std::string to_ret = "";
+    int count = 0;
+    int tmp = 0;
+    for(char& c : str) {
+        if(c == '-'){
+            continue;
+        }
+        if(count == 0){
+            count +=1;
+            tmp = char_to_hex_int[c];
+            continue;
+        }
+        //std::cout << (tmp<<4) << std::endl;
+        //std::cout << char_to_hex_int[c] << std::endl;
+        //std::cout << (tmp<<4 | char_to_hex_int[c]) << std::endl;
+        to_ret += (char) (tmp<<4 | char_to_hex_int[c]);
+        count = 0;    
+    }
+    return to_ret;
+}
+
+std::string MatchUtils::get_read_string(std::string& str){
+    // Convert ASCII represented HexString back to String
+    std::string to_ret = "";
+
+    for(char& c : str) {
+        unsigned char tmp_c = static_cast<unsigned char>(c);
+        //std::cout << (unsigned int) tmp_c << std::endl;
+        unsigned int v1 = ((unsigned int) tmp_c)>>4;
+        //std::cout << v1 << std::endl;
+
+        unsigned int v2 = (((unsigned int) tmp_c)<<28)>>28;
+        //std::cout << v2 << std::endl;
+
+        to_ret += hex_int_string_to_char_string[v1];
+        to_ret += hex_int_string_to_char_string[v2];
+    }
+
+    return to_ret;
+}
+
 void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name, bool reads){
 	using namespace std;
     io::filtering_istream in_filter;

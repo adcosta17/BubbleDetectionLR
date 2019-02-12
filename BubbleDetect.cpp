@@ -77,6 +77,17 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    /*
+    string tmp = "5e6696ec-5b69-4cb7-b0b0-33cccfc6714b";
+    cout << tmp << endl;
+    tmp = MatchUtils::get_hex_string(tmp);
+    cout << tmp << endl;
+    cout << "done1" << endl;
+    tmp = MatchUtils::get_read_string(tmp);
+    cout << tmp << endl;
+    cout << "done" << endl;
+    */
+
     // Read in and Parse input file
 	map<string, vector<Match> > all_matches;
     map<string, vector<Match> > raw_matches;
