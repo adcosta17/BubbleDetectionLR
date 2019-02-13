@@ -18,8 +18,8 @@ CombinePaf: CombinePaf.cpp
 ComputeContained: ComputeContained.cpp
 	g++ -g -std=c++11 -lboost_iostreams ComputeContained.cpp Match.cpp -lm -lz -o ComputeContained 
 
-ProcessBubbleList: ProcessBubbleList.cpp
-	g++ -g -std=c++11 ProcessBubbleList.cpp -o ProcessBubbleList
+ProcessBubbleList: ProcessBubbleList.cpp Read_Alignment.cpp Read_Alignment.hpp Alignment.cpp Alignment.hpp
+	g++ -g -std=c++11 ProcessBubbleList.cpp Read_Alignment.cpp Alignment.cpp -o ProcessBubbleList
 
 ReadCoverageCombined: ReadCoverageCombined.cpp
 	g++ -g -std=c++11 -lboost_iostreams ReadCoverageCombined.cpp -lm -lz -o ReadCoverageCombined

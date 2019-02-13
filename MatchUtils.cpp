@@ -53,6 +53,13 @@ std::string MatchUtils::get_hex_string(std::string& str){
         to_ret += (char) (tmp<<4 | char_to_hex_int[c]);
         count = 0;    
     }
+    if(count == 1){
+        // Have an odd number of characters
+        to_ret += (char) tmp<<4;
+        std::string to_ret2 = "0";
+        to_ret2 += to_ret;
+        return to_ret2;
+    }
     return to_ret;
 }
 
@@ -91,6 +98,8 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     	char c5;
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
+        c1 = MatchUtils::get_hex_string(c1);
+        c6 = MatchUtils::get_hex_string(c6);
         //getline(lin, meta);
         if(reads){
         	read_ids.insert(c1);
@@ -138,6 +147,8 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
     	char c5;
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
+        c1 = MatchUtils::get_hex_string(c1);
+        c6 = MatchUtils::get_hex_string(c6);
         //getline(lin, meta);
         //size_t idx = meta.find("cg:");
         cg = "";
@@ -2595,10 +2606,10 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         	//v_to_w[i].set_length(v);
         	//v_to_w[i].set_orientation(v);
             // Set all w for each edge v->w as in play
-            if(v_to_w[i].reduce){
-            	std::cerr << "Found Already reduced edge from: " << v_to_w[i].query_read_id << " to " << v_to_w[i].target_read_id << std::endl;
-            	continue;
-            }
+            //if(v_to_w[i].reduce){
+            //	std::cerr << "Found Already reduced edge from: " << v_to_w[i].query_read_id << " to " << v_to_w[i].target_read_id << std::endl;
+            //	continue;
+            //}
         	if(v == v_to_w[i].query_read_id){
             	mark[v_to_w[i].target_read_id] = 1;
         	} else {
@@ -2608,9 +2619,9 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         //Match::sort_matches(v_to_w);
         for (int i = 0; i < v_to_w.size(); ++i)
         {
-        	if(v_to_w[i].reduce){
-        		continue;
-        	}
+        	//if(v_to_w[i].reduce){
+        	//	continue;
+        	//}
         	if(v_to_w[i].length > flongest && v_to_w[i].orientation > 0){
                 flongest = v_to_w[i].length;
             }
@@ -2623,10 +2634,10 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         for (int i = 0; i < v_to_w.size(); ++i)
         {
         	int longest = 0;
-        	if(v_to_w[i].reduce){
+        	//if(v_to_w[i].reduce){
         		//std::cerr << v_to_w[i].target_read_id << " " << v_to_w[i].query_read_id	<< " " << v_to_w[i].type << std::endl;
-        		continue;
-        	}
+        	//	continue;
+        	//}
         	if(v_to_w[i].orientation < 0){
         		longest = rlongest;
         	} else {
@@ -2652,13 +2663,13 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
                 //Match::sort_matches(w_to_x);
                 for (int j = 0; j < w_to_x.size(); ++j)
                 {
-		            if(w_to_x[j].reduce){ // ||w_to_x[j].orientation != v_to_w[i].orientation){
+		            //if(w_to_x[j].reduce){ // ||w_to_x[j].orientation != v_to_w[i].orientation){
 		            	// v to w is in one direction, but w to x is in the wrong direction, so ignore it
 		            	//mark[w_to_x[j].target_read_id] = -1;
 		            	//std::cerr << "A0 Oreintation off " << v << " to " << w_to_x[j].target_read_id << std::endl;
 		            	//std::cerr << w_to_x[j].target_read_id << " " << w_to_x[j].query_read_id	<< " " << w_to_x[j].type << std::endl;
-		            	continue;
-		            }
+		            //	continue;
+		            //}
 		            if(v_to_w[i].strand == '-'){
 		            	// w is now flipped, so any w to x that is + is really - in the eyes of v 
 		            	if(w_to_x[j].orientation == v_to_w[i].orientation){

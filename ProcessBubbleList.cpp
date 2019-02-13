@@ -12,9 +12,10 @@
 #include <map>
 #include <vector>
 #include <iterator>
-
+#include "Read_Alignment.hpp"
 
 using namespace std;
+
 
 // take from http://stackoverflow.com/a/236803/248823
 void split(const std::string &s, char delim, std::vector<std::string> &elems) {
@@ -29,41 +30,81 @@ void split(const std::string &s, char delim, std::vector<std::string> &elems) {
 int main(int argc, char** argv) {
 
 	if(argc != 5){
-        cerr << "USAGE: ProcessBubbleList inputBubbleList Sam1 Sam2 outputfile" << endl;
+        cerr << "USAGE: ProcessBubbleList inputBubbleList Prefix1 Prefix2 outputfile" << endl;
         return 0;
     }
 
-    // Read Sams and store the best map score for each read
-    map<string, int> sam1;
-    map<string, int> sam2;
+    map<string, Read_Alignment> all_alignments;
 
-    ifstream inputFileSam1(argv[2]);
+    // Read Pafs first. Create a Read_Alignment for each read
+    // Then as you read the paf create an alignment for each line
+
+    string input = "" + string(argv[2])+ string(".paf");
+    ifstream inputFilePaf1(input);
     string line;
+    while (getline(inputFilePaf1, line))
+    {
+        istringstream lin(line);
+        string id, c6, meta, cg;
+        char c5;
+        int c2, c3, c4, c7, c8, c9, c10, c11, qual;
+        lin >> id >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11 >> qual;
+
+        Alignment tmp_aln(id, c2, c3, c4, qual);
+
+        if(all_alignments.count(id) == 0){
+            Read_Alignment tmp(id, c2);
+	    vector<Alignment> tmp_vec;
+	    tmp.species1_aln = tmp_vec;
+            all_alignments.insert(make_pair(id, tmp));
+        }
+        all_alignments.at(id).species1_aln.push_back(tmp_aln);
+    }
+
+    input = "" + string(argv[3])+ string(".paf");
+    ifstream inputFilePaf2(input);
+    while (getline(inputFilePaf2, line))
+    {
+        istringstream lin(line);
+        string id, c6, meta, cg;
+        char c5;
+        int c2, c3, c4, c7, c8, c9, c10, c11, qual;
+        lin >> id >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11 >> qual;
+
+        Alignment tmp_aln(id, c2, c3, c4, qual);
+
+        if(all_alignments.count(id) == 0){
+            Read_Alignment tmp(id, c2);
+	    vector<Alignment> tmp_vec;
+            tmp.species2_aln = tmp_vec;
+            all_alignments.insert(make_pair(id, tmp));
+        }
+        all_alignments.at(id).species2_aln.push_back(tmp_aln);
+    }
+
+    input = "" + string(argv[2]) + string(".sam");
+    ifstream inputFileSam1(input);
     while (getline(inputFileSam1, line))
     {
         istringstream lin(line);
-        string id, tmp1, tmp2, tmp3;
+        string id;
         int mapscore;
-        lin >> id >> tmp1 >> tmp2 >> tmp3 >> mapscore;
-        if(sam1.count(id) == 0){
-            sam1.insert(make_pair(id, mapscore));
-        } else if(sam1[id] < mapscore){
-            sam1[id] = mapscore;
+        lin >> id >> mapscore;
+        if(mapscore >= 2048){
+            all_alignments.at(id).split_1 = true;
         }
-        cout << sam1[id] << endl;
     }
 
-    ifstream inputFileSam2(argv[3]);
+    input = "" + string(argv[3])+ string(".sam");
+    ifstream inputFileSam2(input);
     while (getline(inputFileSam2, line))
     {
         istringstream lin(line);
-        string id, tmp1, tmp2, tmp3;
+        string id;
         int mapscore;
-        lin >> id >> tmp1 >> tmp2 >> tmp3 >> mapscore;
-        if(sam2.count(id) == 0){
-            sam2.insert(make_pair(id, mapscore));
-        } else if(sam2[id] < mapscore){
-            sam2[id] = mapscore;
+        lin >> id >> mapscore;
+        if(mapscore >= 2048){
+            all_alignments.at(id).split_2 = true;
         }
     }
 
@@ -77,6 +118,7 @@ int main(int argc, char** argv) {
         split(line, '\t', row);
         float score = stof(row[0]);
         int num_reads = stoi(row[1]);
+        int diff_tax = stoi(row[5]);
 
         cout << score << endl;
 
@@ -93,43 +135,6 @@ int main(int argc, char** argv) {
         while(getline(data2,read,' '))
         {
             arm2.push_back(read);
-        }
-
-        // Compute the average mapscore for arm1 and arm2 for each sam
-        float a1ms1 =0;
-        float a1ms2 =0;
-        float a2ms1 =0;
-        float a2ms2 =0;
-        for(int i = 0; i < arm1.size() -1; i++){
-            if(i == 0) {
-                continue;
-            }
-            if(sam1.count(arm1[i]) > 0){
-                a1ms1 += static_cast<float>(sam1[arm1[i]]);
-            }
-            if(sam2.count(arm1[i]) > 0){
-                a1ms2 += static_cast<float>(sam2[arm1[i]]);
-            }
-        }
-        if(arm1.size()-2 > 0){
-            a1ms1 = a1ms1/(arm1.size()-2);
-            a1ms2 = a1ms2/(arm1.size()-2);
-        }
-
-        for(int i = 0; i < arm2.size() -1; i++){
-            if(i == 0) {
-                continue;
-            }
-            if(sam1.count(arm2[i]) > 0){
-                a2ms1 += static_cast<float>(sam1[arm2[i]]);
-            }
-            if(sam2.count(arm2[i]) > 0){
-                a2ms2 += static_cast<float>(sam2[arm2[i]]);
-            }
-        }
-        if(arm2.size()-2){
-            a2ms1 = a2ms1/(arm2.size()-2);
-            a2ms2 = a2ms2/(arm2.size()-2);
         }
 
         // Want to count the number of reads in each arm that mapped uniquely to each species and the ones that mapped to both or neither
@@ -150,10 +155,11 @@ int main(int argc, char** argv) {
         for(int i = 0; i < arm1.size(); i++){
             bool s1 = false;
             bool s2 = false;
-            if(sam1.count(arm1[i]) > 0 && sam1[arm1[i]] >= 30){
+            // check arm[i] against species 1
+            if(all_alignments.at(arm1[i]).align_species_1()){
                 s1 = true;
             }
-            if(sam2.count(arm1[i]) > 0 && sam2[arm1[i]] >= 30){
+            if(all_alignments.at(arm1[i]).align_species_2()){
                 s2 = true;
             }
             if(s1 && s2){
@@ -186,10 +192,10 @@ int main(int argc, char** argv) {
         for(int i = 0; i < arm2.size(); i++){
             bool s1 = false;
             bool s2 = false;
-            if(sam1.count(arm2[i]) > 0 && sam1[arm2[i]] >= 30){
+            if(all_alignments.at(arm2[i]).align_species_1()){
                 s1 = true;
             }
-            if(sam2.count(arm2[i]) > 0 && sam2[arm2[i]] >= 30){
+            if(all_alignments.at(arm2[i]).align_species_2()){
                 s2 = true;
             }
             if(s1 && s2){
@@ -205,7 +211,7 @@ int main(int argc, char** argv) {
 
 
         // bubble start and end will be same for both arm
-        output << score << "\t" << num_reads << "\t" << a1ms1 << "\t" << a1ms2 << "\t" << a2ms1 << "\t" << a2ms2 << "\t" << arm1_uniuqe_s1 << "\t" << arm1_uniuqe_s2 << "\t" << arm1_both << "\t" << arm1_neither << "\t" << arm2_uniuqe_s1 << "\t" << arm2_uniuqe_s2 << "\t" << arm2_both << "\t" << arm2_neither << "\t" << start_in_s1 << "\t" << start_in_s2 << "\t" << end_in_s1 << "\t" << end_in_s2 <<"\n";
+        output << score << "\t" << num_reads << "\t" << diff_tax << "\t" << arm1_uniuqe_s1 << "\t" << arm1_uniuqe_s2 << "\t" << arm1_both << "\t" << arm1_neither << "\t" << arm2_uniuqe_s1 << "\t" << arm2_uniuqe_s2 << "\t" << arm2_both << "\t" << arm2_neither << "\t" << start_in_s1 << "\t" << start_in_s2 << "\t" << end_in_s1 << "\t" << end_in_s2 <<"\n";
      }
 
      output.close();

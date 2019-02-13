@@ -113,6 +113,7 @@ int main(int argc, char** argv)
             string id, classification;
             lin >> classification >> id;
             if(classification == "Chimeric"){
+                id = MatchUtils::get_hex_string(id);
                 chimeric_reads.insert(id);
             }
         }
@@ -139,6 +140,7 @@ int main(int argc, char** argv)
                     istringstream lin(line);
                     string id, classification, level;
                     lin >> id;
+                    id = MatchUtils::get_hex_string(id);
                     getline(lin, classification);
                     stringstream  data(classification);
                     vector<string> result;
@@ -184,6 +186,7 @@ int main(int argc, char** argv)
                     int len;
                     float cov;
                     lin >> id >> len >> cov;
+                    id = MatchUtils::get_hex_string(id);
                     if(cov < 1){
                     	cov = 1.0;
                     }
@@ -254,6 +257,7 @@ int main(int argc, char** argv)
                     	cov = 1.0;
                     }
                     lin >> id >> len >> cov;
+                    id = MatchUtils::get_hex_string(id);
                     tmp_read_coverage.insert(make_pair(id, cov*len));
                     num_bases += len;
                     //cout << read_coverage[id] << endl;
@@ -278,6 +282,7 @@ int main(int argc, char** argv)
                 	cov = 1.0;
                 }
                 lin >> id >> len >> cov;
+                id = MatchUtils::get_hex_string(id);
                 read_coverage.insert(make_pair(id, cov));
             }
         }
@@ -341,7 +346,8 @@ int main(int argc, char** argv)
     
     map<string, string> read_names;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
-            read_names.insert(make_pair(*it, *it));
+            string tmp_string(*it);
+            read_names.insert(make_pair(*it, MatchUtils::get_read_string(tmp_string)));
     }
     map<string, string> colours;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
@@ -375,6 +381,7 @@ int main(int argc, char** argv)
             istringstream lin(line);
             string id, classification, level;
             lin >> id;
+            id = MatchUtils::get_hex_string(id);
             getline(lin, classification);
             stringstream  data(classification);
             vector<string> result;
@@ -609,11 +616,12 @@ int main(int argc, char** argv)
         	    float arm_ratio = MatchUtils::getArmLengthRatio(tmp_arms, all_matches);
           
                 // Score Bubbles based on values seen
-                //Linear:   
-                float weights[7] = {0.003137, -0.077071, 0.028428, 0.024931, 0.533754, 0.128592, 0.014294};
+                //Linear:
+                //zfloat weights[7] = {0.003137, -0.077071, 0.028428, 0.024931, 0.533754, 0.128592, 0.014294};
+                float weights[7] = {0.01168, -0.01318, -0.02567, 0.04757, 0, 0.15386, 0.01443};
                 //Logistic:
                 //int weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
-                float score = 0.111063;
+                float score = 0.215955;
                 score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
                 if(true_bubble){
                     score += weights[1];
