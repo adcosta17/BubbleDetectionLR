@@ -130,7 +130,7 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     }
 }
 
-std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw){
+std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw){
 	using namespace std;
 
 	io::filtering_istream in;
@@ -197,8 +197,18 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
             tmpLine.overlap_species = name;
 	        if(c1 < c6) {
 	        	all_matches[c1].push_back(tmpLine);
+	        	if(matches_indexed.count(c6) == 0){
+	        		vector<string> tmp;
+	        		matches_indexed.insert(pair<string, vector<string> >(c6, tmp));
+	        	}
+	        	matches_indexed[c6].push_back(c1);
 	        } else {
 	        	all_matches[c6].push_back(tmpLine);
+	        	if(matches_indexed.count(c1) == 0){
+	        		vector<string> tmp;
+	        		matches_indexed.insert(pair<string, vector<string> >(c1, tmp));
+	        	}
+	        	matches_indexed[c1].push_back(c6);
 	        }
             /*
 	        if(edge_lists.count(c1) == 0){
@@ -277,10 +287,11 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
         set<string> tmp_read_ids;
         map<string, vector<Match>> tmp_all_matches;
         map<string, vector<Match>> tmp_raw_matches;
+        map<string, vector<string>> matches_indexed;
         map<string, vector<string> > read_indegree;
         map<string, vector<string> > read_outdegree;
         cerr << "\tReading in overlaps" << endl;
-        vector<int> sizes = get_all_matches_for_file(tmp_all_matches, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
+        vector<int> sizes = get_all_matches_for_file(tmp_all_matches, matches_indexed, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
         if(sizes.size() == 0){
             continue;
         }
@@ -288,7 +299,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
         total_reads.push_back(sizes.size());
         average_read_lens.push_back(mean_read_length);
 
-        reduce_edges(tmp_all_matches, tmp_read_ids, fuzz);
+        reduce_edges(tmp_all_matches, matches_indexed, tmp_read_ids, fuzz);
         read_indegree.clear();
         read_outdegree.clear();
         compute_in_out_degree(tmp_all_matches, tmp_read_ids, read_indegree, read_outdegree);
@@ -379,7 +390,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
 
 
 
-int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold){
+int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold){
 	using namespace std;
 	set<string> paf_files;
 	DIR *dir;
@@ -427,7 +438,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
         set<string> tmp_read_ids;
         map<string, vector<Match>> tmp_raw_matches;
         cerr << "\tReading in overlaps" << endl;
-		vector<int> sizes = get_all_matches_for_file(all_matches, tmp_raw_matches, read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
+		vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, tmp_raw_matches, read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
         if(sizes.size() == 0){
             continue;
         }
@@ -446,7 +457,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
     }
 
     // Reduce the edges of the combined all_matches set
-    reduce_edges(all_matches, read_ids, fuzz);
+    reduce_edges(all_matches, matches_indexed, read_ids, fuzz);
     read_indegree.clear();
     read_outdegree.clear();
     compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
@@ -475,7 +486,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
     return mean_read_length;
 }
 
-int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
+int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
 {
 	using namespace std;
     io::filtering_istream in_filter;
@@ -492,7 +503,7 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_ma
 	cerr << "Reading in all valid Matches" << endl;
 
 	read_ids.clear();
-	vector<int> sizes = get_all_matches_for_file(all_matches, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", false);
+	vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", false);
 
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
 }
@@ -2562,27 +2573,28 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
     return contig_number;
 }
 
-std::vector<Match> get_all_matches_for_node(std::map<std::string, std::vector<Match> >& all_matches, std::string v){
+std::vector<Match> get_all_matches_for_node(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::string v){
     std::vector<Match> tmp;
-    for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it){
-        if(it->first <= v){
-            // If greater than v no edge to v exits here. Nodes are indexed by the smaller edge
-            for (int i = 0; i < it->second.size(); ++i){
-                if(it->second[i].query_read_id == v){
-                    tmp.push_back(it->second[i]);
-                } else if (it->second[i].target_read_id == v){
-                    Match tmp_match = Match(it->second[i].target_read_id, it->second[i].target_read_length, it->second[i].target_read_start, it->second[i].target_read_end,
-                        it->second[i].strand, it->second[i].query_read_id, it->second[i].query_read_length, it->second[i].query_read_start, it->second[i].query_read_end, 0, 0, 0, 0, "");
-                    tmp_match.check_match_contained();
-                    tmp.push_back(tmp_match);
-                }
+    // First get all v
+    for (int i = 0; i < all_matches[v].size(); ++i){
+    	tmp.push_back(all_matches[v][i]);
+    }
+    for(int j = 0; j < matches_indexed[v].size(); j++){
+        for (int i = 0; i < all_matches[matches_indexed[v][j]].size(); ++i){
+            if(all_matches[matches_indexed[v][j]][i].query_read_id == v){
+                tmp.push_back(all_matches[matches_indexed[v][j]][i]);
+            } else if (all_matches[matches_indexed[v][j]][i].target_read_id == v){
+                Match tmp_match = Match(all_matches[matches_indexed[v][j]][i].target_read_id, all_matches[matches_indexed[v][j]][i].target_read_length, all_matches[matches_indexed[v][j]][i].target_read_start, all_matches[matches_indexed[v][j]][i].target_read_end,
+                    all_matches[matches_indexed[v][j]][i].strand, all_matches[matches_indexed[v][j]][i].query_read_id, all_matches[matches_indexed[v][j]][i].query_read_length, all_matches[matches_indexed[v][j]][i].query_read_start, all_matches[matches_indexed[v][j]][i].query_read_end, 0, 0, 0, 0, "");
+                tmp_match.check_match_contained();
+                tmp.push_back(tmp_match);
             }
         }
     }
     return tmp;
 }
 
-void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_matches, std::set<std::string>& read_ids, int fuzz)
+void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::set<std::string>& read_ids, int fuzz)
 {
 	//int fuzz = 3500;
 	int count = 0;
@@ -2596,7 +2608,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
     for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
         std::string v = *it;
         // Get a vector that has all the edges that come in/out of v (bidirected edges)
-        std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, v);
+        std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, matches_indexed ,v);
         int flongest = 0;
         int rlongest = 0;
         for (int i = 0; i < v_to_w.size(); ++i)
@@ -2652,7 +2664,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
             }
             if(mark[w] == 1){
                 //std::cerr << "  " << w << std::endl;
-                std::vector<Match> w_to_x = get_all_matches_for_node(all_matches, w);
+                std::vector<Match> w_to_x = get_all_matches_for_node(all_matches, matches_indexed, w);
         		//MatchUtils::get_all_matches_for_node(all_matches, w, w_to_x);
         		//for (int j = 0; j < w_to_x.size(); j++)
                 //{
