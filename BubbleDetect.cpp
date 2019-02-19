@@ -40,9 +40,10 @@ int main(int argc, char** argv)
     bool collapse_contigs = false;
     bool is_binned = false;
     bool skip_bubble = false;
+    bool use_names_as_is = false;
     int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:x:")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:z:x:")) != EOF)
     {
         switch(opt)
         {
@@ -60,6 +61,7 @@ int main(int argc, char** argv)
             case 'l': collapse_contigs = true; break;
             case 'b': is_binned = true; break;
             case 'x': skip_bubble = true; break;
+            case 'z': use_names_as_is = true; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -75,7 +77,7 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)\n (optional) -x skip bubble detection if needed\n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)\n (optional) -x skip bubble detection if needed\n (optional) -z use_names_as_is, don't compress read ids. Useful if read ids aren't in normal Nanopre ID form \n";
         return 0;
     }
 
@@ -116,7 +118,7 @@ int main(int argc, char** argv)
             string id, classification;
             lin >> classification >> id;
             if(classification == "Chimeric"){
-                id = MatchUtils::get_hex_string(id);
+                id = MatchUtils::get_hex_string(id, use_names_as_is);
                 chimeric_reads.insert(id);
             }
         }
@@ -143,7 +145,7 @@ int main(int argc, char** argv)
                     istringstream lin(line);
                     string id, classification, level;
                     lin >> id;
-                    id = MatchUtils::get_hex_string(id);
+                    id = MatchUtils::get_hex_string(id,use_names_as_is);
                     getline(lin, classification);
                     stringstream  data(classification);
                     vector<string> result;
@@ -189,7 +191,7 @@ int main(int argc, char** argv)
                     int len;
                     float cov;
                     lin >> id >> len >> cov;
-                    id = MatchUtils::get_hex_string(id);
+                    id = MatchUtils::get_hex_string(id,use_names_as_is);
                     if(cov < 1){
                     	cov = 1.0;
                     }
@@ -260,7 +262,7 @@ int main(int argc, char** argv)
                     	cov = 1.0;
                     }
                     lin >> id >> len >> cov;
-                    id = MatchUtils::get_hex_string(id);
+                    id = MatchUtils::get_hex_string(id,use_names_as_is);
                     tmp_read_coverage.insert(make_pair(id, cov*len));
                     num_bases += len;
                     //cout << read_coverage[id] << endl;
@@ -285,7 +287,7 @@ int main(int argc, char** argv)
                 	cov = 1.0;
                 }
                 lin >> id >> len >> cov;
-                id = MatchUtils::get_hex_string(id);
+                id = MatchUtils::get_hex_string(id,use_names_as_is);
                 read_coverage.insert(make_pair(id, cov));
             }
         }
@@ -301,7 +303,7 @@ int main(int argc, char** argv)
         return 0;
     } else if(is_file(pafFile.c_str())){
         cerr << "Parsing Paf Input File" << endl;
-        mean_read_length = MatchUtils::read_paf_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, false);
+        mean_read_length = MatchUtils::read_paf_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, false, use_names_as_is);
         cerr << read_ids.size() << " Unique Reads found in File"<< endl;
         cerr << "Average Read Length of " << mean_read_length << " base pairs" << endl;
         // Myers Transitive Reduction Alg
@@ -335,13 +337,13 @@ int main(int argc, char** argv)
 
     } else if(is_dir(pafFile.c_str()) && is_binned){
         cerr << "Parsing Paf Input Directory" << endl;
-        mean_read_length = MatchUtils::read_and_assemble_paf_dir_binned(all_matches, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold);
+        mean_read_length = MatchUtils::read_and_assemble_paf_dir_binned(all_matches, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold, use_names_as_is);
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
     } else if(is_dir(pafFile.c_str())){
         cerr << "Parsing Paf Input Directory" << endl;
-        mean_read_length = MatchUtils::read_and_assemble_paf_dir(all_matches, matches_indexed, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold);
+        mean_read_length = MatchUtils::read_and_assemble_paf_dir(all_matches, matches_indexed, n50_values, read_ids, read_lengths, pafFile, chimeric_reads, read_classification, fuzz, iterations, threshold, use_names_as_is);
         read_indegree.clear();
         read_outdegree.clear();
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
@@ -350,7 +352,7 @@ int main(int argc, char** argv)
     map<string, string> read_names;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             string tmp_string(*it);
-            read_names.insert(make_pair(*it, MatchUtils::get_read_string(tmp_string)));
+            read_names.insert(make_pair(*it, MatchUtils::get_read_string(tmp_string, use_names_as_is)));
     }
     map<string, string> colours;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
@@ -384,7 +386,7 @@ int main(int argc, char** argv)
             istringstream lin(line);
             string id, classification, level;
             lin >> id;
-            id = MatchUtils::get_hex_string(id);
+            id = MatchUtils::get_hex_string(id,use_names_as_is);
             getline(lin, classification);
             stringstream  data(classification);
             vector<string> result;
@@ -603,42 +605,44 @@ int main(int argc, char** argv)
 	                    tmp_arms.push_back(arms[i]);
 	                }
 
-	                vector<float> tax_and_cov; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
-	                bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
-	                float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
-	                bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
-	            	if(tax && coverage && (mpa || binned)){
-	                    tax_and_cov = MatchUtils::validBubbleTaxCov(tmp_arms, read_coverage, per_species_coverage, read_levels, read_lengths, binned, all_matches);
-	            	}
-	                if(tax) {
-	                    tax_only = MatchUtils::validBubbleTax(tmp_arms, read_lowest_taxonomy);
-	            	}
-	                if (coverage){
-	            		cov_only = MatchUtils::validBubbleCov(tmp_arms, read_coverage, read_lengths);
-	            	}
-	        	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
-	        	    float arm_ratio = MatchUtils::getArmLengthRatio(tmp_arms, all_matches);
-	          
-	                // Score Bubbles based on values seen
-	                //Linear:
-	                //zfloat weights[7] = {0.003137, -0.077071, 0.028428, 0.024931, 0.533754, 0.128592, 0.014294};
-	                float weights[7] = {0.01168, -0.01318, -0.02567, 0.04757, 0, 0.15386, 0.01443};
-	                //Logistic:
-	                //int weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
-	                float score = 0.215955;
-	                score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
-	                if(true_bubble){
-	                    score += weights[1];
-	                }
-	                if(tax_and_cov.size() == 2){
-	                   score += tax_and_cov[0]*weights[2];
-	                   score += tax_and_cov[1]*weights[3];
-	                }
-	                if(tax_only){
-	                    score += weights[4];
-	                }
-	                score += cov_only*weights[5];
-	                score += arm_ratio*weights[6];
+                vector<float> tax_and_cov; // checks if the coverage for each arm matches the average coverage it should have based on the taxinomic classification of the reads in the arm
+                bool tax_only = false; // checks to see if each arm contains at least one unique classification (ideally one read at least in each arm that has a species or subspecies that isnt in the other)
+                float cov_only = 0.0; // checks each arm to see if there is a drastic difference in the coverage between them (Possible to detect small errors that cause bubbles by this method as sequencing errors should have lower coverage)
+                bool true_bubble = false; // checks to see if the two arms form a true bubble, that is only the start and end nodes have edges to things not in the bubble (two clean arms)
+            	if(tax && coverage && (mpa || binned)){
+                    tax_and_cov = MatchUtils::validBubbleTaxCov(tmp_arms, read_coverage, per_species_coverage, read_levels, read_lengths, binned, all_matches);
+            	}
+                if(tax) {
+                    tax_only = MatchUtils::validBubbleTax(tmp_arms, read_lowest_taxonomy);
+            	}
+                if (coverage){
+            		cov_only = MatchUtils::validBubbleCov(tmp_arms, read_coverage, read_lengths);
+            	}
+        	    true_bubble =  MatchUtils::check_bubble((it->first).first, (it->first).second, it->second, read_indegree, read_outdegree);
+        	    float arm_ratio = MatchUtils::getArmLengthRatio(tmp_arms, all_matches);
+          
+                // Score Bubbles based on values seen
+                //Linear:
+                //zfloat weights[7] = {0.003137, -0.077071, 0.028428, 0.024931, 0.533754, 0.128592, 0.014294};
+                    //float weights[7] = {0.01168, -0.01318, -0.02567, 0.04757, 0, 0.15386, 0.01443};
+                float weights[7] = {0.0074516, -0.0076223, -0.3106360, 0.1244762, -0.0040885, 0.2389054, -0.0002485};
+                //Logistic:
+                //float weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
+                //float score = 0.215955;
+                float score = 0.0542166;
+                score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
+                if(true_bubble){
+                    score += weights[1];
+                }
+                if(tax_and_cov.size() == 2){
+                   score += tax_and_cov[0]*weights[2];
+                   score += tax_and_cov[1]*weights[3];
+                }
+                if(tax_only){
+                    score += weights[4];
+                }
+                score += cov_only*weights[5];
+                score += arm_ratio*weights[6];
 
 	                bubbleOutput << score << "\t";
 	                bubbleOutput << tmp_arms[0].size()+tmp_arms[1].size() << "\t";

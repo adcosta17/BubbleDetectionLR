@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     map<string, Read> read_classification;
     map<string, vector<string>> matches_indexed;
     map<string, int> read_lengths;
-    MatchUtils::read_paf_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, argv[1], chimeric_reads, read_classification, true);
+    MatchUtils::read_paf_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, argv[1], chimeric_reads, read_classification, true, true);
     cout << raw_matches.size() << endl;
     string source_read = argv[2];
     int levels = atoi(argv[3]);

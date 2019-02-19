@@ -33,8 +33,11 @@ int char_to_hex_int[103] = {
 std::string hex_int_string_to_char_string[16] = {
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"};
 
-std::string MatchUtils::get_hex_string(std::string& str){
+std::string MatchUtils::get_hex_string(std::string& str, bool use_names_as_is){
     // Convert ReadId to ACSII represented HexString
+    if(use_names_as_is){
+        return str;
+    }
     std::string to_ret = "";
     int count = 0;
     int tmp = 0;
@@ -63,7 +66,10 @@ std::string MatchUtils::get_hex_string(std::string& str){
     return to_ret;
 }
 
-std::string MatchUtils::get_read_string(std::string& str){
+std::string MatchUtils::get_read_string(std::string& str, bool use_names_as_is){
+    if(use_names_as_is){
+        return str;
+    }
     // Convert ASCII represented HexString back to String
     std::string to_ret = "";
 
@@ -83,7 +89,7 @@ std::string MatchUtils::get_read_string(std::string& str){
     return to_ret;
 }
 
-void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name, bool reads){
+void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name, bool reads, bool use_names_as_is){
 	using namespace std;
     io::filtering_istream in_filter;
     in_filter.push(io::gzip_decompressor());
@@ -98,8 +104,8 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     	char c5;
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
-        c1 = MatchUtils::get_hex_string(c1);
-        c6 = MatchUtils::get_hex_string(c6);
+        c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
+        c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
         //getline(lin, meta);
         if(reads){
         	read_ids.insert(c1);
@@ -130,7 +136,7 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     }
 }
 
-std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw){
+std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw, bool use_names_as_is){
 	using namespace std;
 
 	io::filtering_istream in;
@@ -147,8 +153,8 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
     	char c5;
     	int c2, c3, c4, c7, c8, c9, c10, c11;
     	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
-        c1 = MatchUtils::get_hex_string(c1);
-        c6 = MatchUtils::get_hex_string(c6);
+        c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
+        c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
         //getline(lin, meta);
         //size_t idx = meta.find("cg:");
         cg = "";
@@ -241,7 +247,7 @@ std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Matc
     return sizes;
 }
 
-int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold){
+int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vector<Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold, bool use_names_as_is){
     using namespace std;
     set<string> paf_files;
     DIR *dir;
@@ -275,7 +281,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
         // get species name
         string tmp = *it;
         set<string> tmp_read_ids;
-        get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
+        get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false, use_names_as_is);
         
     }
 
@@ -291,7 +297,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
         map<string, vector<string> > read_indegree;
         map<string, vector<string> > read_outdegree;
         cerr << "\tReading in overlaps" << endl;
-        vector<int> sizes = get_all_matches_for_file(tmp_all_matches, matches_indexed, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
+        vector<int> sizes = get_all_matches_for_file(tmp_all_matches, matches_indexed, tmp_raw_matches, tmp_read_ids, read_lengths, tmp, read_classification, to_drop, name, false, use_names_as_is);
         if(sizes.size() == 0){
             continue;
         }
@@ -390,7 +396,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
 
 
 
-int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold){
+int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold, bool use_names_as_is){
 	using namespace std;
 	set<string> paf_files;
 	DIR *dir;
@@ -422,7 +428,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
 	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         set<string> tmp_read_ids;
         string tmp = *it;
-		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false);
+		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false, use_names_as_is);
 
     }
 
@@ -438,7 +444,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
         set<string> tmp_read_ids;
         map<string, vector<Match>> tmp_raw_matches;
         cerr << "\tReading in overlaps" << endl;
-		vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, tmp_raw_matches, read_ids, read_lengths, tmp, read_classification, to_drop, name, false);
+		vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, tmp_raw_matches, read_ids, read_lengths, tmp, read_classification, to_drop, name, false, use_names_as_is);
         if(sizes.size() == 0){
             continue;
         }
@@ -486,7 +492,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
     return mean_read_length;
 }
 
-int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa)
+int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa, bool use_names_as_is)
 {
 	using namespace std;
     io::filtering_istream in_filter;
@@ -498,12 +504,12 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_ma
     set<string> to_drop;
     int count = 0;
     cerr << "Checking for Contained Reads" << endl;
-    get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name, true);
+    get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name, true, use_names_as_is);
 	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
 	cerr << "Reading in all valid Matches" << endl;
 
 	read_ids.clear();
-	vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", false);
+	vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", false, use_names_as_is);
 
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
 }
