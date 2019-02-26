@@ -41,6 +41,7 @@ int main(int argc, char** argv)
     bool is_binned = false;
     bool skip_bubble = false;
     bool use_names_as_is = false;
+    bool do_assembly_stats = false;
     int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
     while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:z:x:")) != EOF)
@@ -62,6 +63,7 @@ int main(int argc, char** argv)
             case 'b': is_binned = true; break;
             case 'x': skip_bubble = true; break;
             case 'z': use_names_as_is = true; break;
+            case 'a': do_assembly_stats = true; break;
             case '?': exit = true; break;
             default: exit=true;
         }
@@ -622,13 +624,7 @@ int main(int argc, char** argv)
         	    float arm_ratio = MatchUtils::getArmLengthRatio(tmp_arms, all_matches);
           
                 // Score Bubbles based on values seen
-                //Linear:
-                //zfloat weights[7] = {0.003137, -0.077071, 0.028428, 0.024931, 0.533754, 0.128592, 0.014294};
-                    //float weights[7] = {0.01168, -0.01318, -0.02567, 0.04757, 0, 0.15386, 0.01443};
                 float weights[7] = {0.0074516, -0.0076223, -0.3106360, 0.1244762, -0.0040885, 0.2389054, -0.0002485};
-                //Logistic:
-                //float weights[7] = {0.02297, 0.03667, 3.11104, -0.06563, 0.29392, -4.52549, 0.40195};
-                //float score = 0.215955;
                 float score = 0.0542166;
                 score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
                 if(true_bubble){
@@ -702,19 +698,21 @@ int main(int argc, char** argv)
     read_outdegree.clear();
     MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
 
-    ofstream n50Output;
-    n50Output.open(outputFileName+"_assembly_stats.txt");
+    if(do_assembly_stats){
+        ofstream n50Output;
+        n50Output.open(outputFileName+"_assembly_stats.txt");
 
-    for (int k = 0; k < n50_values.size(); k++)
-    {
-        n50Output << n50_values[k] << "\n"; 
+        for (int k = 0; k < n50_values.size(); k++)
+        {
+            n50Output << n50_values[k] << "\n"; 
+        }
+        if(use_ng50){
+            n50Output << "Overall\t" << MatchUtils::compute_ng50(all_matches, read_indegree, read_outdegree, read_ids, genome_size, 2*mean_read_length) << "\n";
+        } else {
+            n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids, 2*mean_read_length) << "\n";
+        }
+        n50Output.close();
     }
-    if(use_ng50){
-        n50Output << "Overall\t" << MatchUtils::compute_ng50(all_matches, read_indegree, read_outdegree, read_ids, genome_size, 2*mean_read_length) << "\n";
-    } else {
-        n50Output << "Overall\t" << MatchUtils::compute_n50(all_matches, read_indegree, read_outdegree, read_ids, 2*mean_read_length) << "\n";
-    }
-    n50Output.close();
 
     MatchUtils::toGfa(all_matches,read_lengths, outputFileName+".gfa", read_indegree, read_outdegree, read_names, colours, read_coverage);
 
