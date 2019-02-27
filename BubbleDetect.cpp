@@ -41,10 +41,10 @@ int main(int argc, char** argv)
     bool is_binned = false;
     bool skip_bubble = false;
     bool use_names_as_is = false;
-    bool do_assembly_stats = false;
+    bool do_assembly_stats = true;
     int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:z:x:")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:z:x:a:")) != EOF)
     {
         switch(opt)
         {
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
             case 'b': is_binned = true; break;
             case 'x': skip_bubble = true; break;
             case 'z': use_names_as_is = true; break;
-            case 'a': do_assembly_stats = true; break;
+            case 'a': do_assembly_stats = false; break;
             case '?': exit = true; break;
             default: exit=true;
         }
