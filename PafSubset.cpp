@@ -15,7 +15,7 @@ void helper(set<string>& ids, int levels, string source_read, map<string, vector
             // Want to get some number of levels from the source
             for (map<string, vector<Match> >::iterator it=raw_matches.begin(); it!=raw_matches.end(); ++it)
             {
-                for (int i = 0; i < it->second.size(); ++i)
+                for (std::size_t i = 0; i < it->second.size(); ++i)
                 {
                     if(it->second[i].query_read_id == source_read){
                         if(ids.count(it->second[i].target_read_id) == 0){
@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     helper(ids, levels, source_read, raw_matches);
     for (map<string, vector<Match> >::iterator it=raw_matches.begin(); it!=raw_matches.end(); ++it)
     {
-        for (int i = 0; i < it->second.size(); ++i)
+        for (std::size_t i = 0; i < it->second.size(); ++i)
         {
             //Iterate over every edge, if edge contains an id in id set then output it in paf form
             if(find(ids.begin(), ids.end(), it->second[i].query_read_id) != ids.end() || find(ids.begin(), ids.end(), it->second[i].target_read_id) != ids.end()) {

@@ -174,7 +174,7 @@ int main(int argc, char** argv)
     	// Otherwise compute the longest common substring between the classifications
     	string k_string = it->second[0];
     	string m_string = read_classifications_mpa[it->first][0];
-    	for(int i = 1; i < it->second.size(); i++){
+    	for(std::size_t i = 1; i < it->second.size(); i++){
     		k_string = longestCommonSubstring(k_string, it->second[i], ';');
     		m_string = longestCommonSubstring(m_string, read_classifications_mpa[it->first][i], '|');
     	}

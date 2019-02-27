@@ -90,7 +90,6 @@ int main(int argc, char** argv)
 
     // Take the list of paf_files and then for each of them read in the file
     cerr << "Reading in Contained Reads" << endl;
-    int count = 0;
     for (set<string>::iterator it = txt_files.begin(); it != txt_files.end(); ++it) {
     	string tmp = *it;
         size_t found = tmp.find_last_of("/");

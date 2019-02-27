@@ -14,7 +14,7 @@ bool Read_Alignment::align_species_1(){
 		// IE Chimeric or doesn't map fully
 		return false;
 	}
-	for(int i = 0; i < species1_aln.size(); i++){
+	for(std::size_t i = 0; i < species1_aln.size(); i++){
 		if(species1_aln[i].qual > 30){
 			if((species1_aln[i].end - species1_aln[i].start)/static_cast<float>(length) > 0.5){
 				return true;
@@ -30,7 +30,7 @@ bool Read_Alignment::align_species_2(){
 		// IE Chimeric or doesn't map fully
 		return false;
 	}
-	for(int i = 0; i < species2_aln.size(); i++){
+	for(std::size_t i = 0; i < species2_aln.size(); i++){
 		if(species2_aln[i].qual > 30){
 			if((species2_aln[i].end - species2_aln[i].start)/static_cast<float>(length) > 0.5){
 				return true;

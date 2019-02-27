@@ -171,7 +171,7 @@ int main(int argc, char** argv)
                     groups.push_back('s');
                     read_levels.insert(make_pair(id, tmp));
                     read_groups[tmp].insert(id);
-                    for(int k = 0; k < groups.size(); k++){
+                    for(size_t k = 0; k < groups.size(); k++){
                         tmp = mpa_read_classification.at(id).getClassificationForFileName(groups[k]);
                         if(tmp != ""){
                             read_levels[id] = tmp;
@@ -563,8 +563,8 @@ int main(int argc, char** argv)
 	            continue;
 	        }
 
-	        for(int i = 0; i<arms.size(); i++){
-	            for(int j = 1; j < arms.size(); j++){
+	        for(size_t i = 0; i<arms.size(); i++){
+	            for(size_t j = 1; j < arms.size(); j++){
 	                if(i >= j){
 	                    continue;
 	                }
@@ -661,11 +661,11 @@ int main(int argc, char** argv)
 	                }
 	                bubbleOutput << "\t" << cov_only << "\t" << arm_ratio << "\t";
 	                bubbleOutput << read_names[(it->first).first] << "\t" << read_names[(it->first).second] << "\t";
-	                for(int k = 0; k < tmp_arms[0].size(); k++){
+	                for(size_t k = 0; k < tmp_arms[0].size(); k++){
 	                    bubbleOutput << tmp_arms[0][k] << " ";
 	                }
 	                bubbleOutput << "\t";
-	                for(int k = 0; k < tmp_arms[1].size(); k++){
+	                for(size_t k = 0; k < tmp_arms[1].size(); k++){
 	                    bubbleOutput << tmp_arms[1][k] << " ";
 	                }
 	                bubbleOutput << endl;
@@ -702,7 +702,7 @@ int main(int argc, char** argv)
         ofstream n50Output;
         n50Output.open(outputFileName+"_assembly_stats.txt");
 
-        for (int k = 0; k < n50_values.size(); k++)
+        for (size_t k = 0; k < n50_values.size(); k++)
         {
             n50Output << n50_values[k] << "\n"; 
         }

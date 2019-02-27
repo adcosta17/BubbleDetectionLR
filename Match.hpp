@@ -18,14 +18,14 @@ public:
 	int residue_matches;
 	int alignment_block;
 	bool reversed;
-	bool reduce;
 	int prefix_length;
 	int suffix_length;
-	std::string cigar;
 	std::vector<std::string> reads_contained;
 	char fixed_strand;
 	int length;
 	int orientation;
+	std::string cigar;
+	bool reduce;
 	int length_to_use;
 	std::string overlap_species; 
 

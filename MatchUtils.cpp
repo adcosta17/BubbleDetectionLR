@@ -47,13 +47,13 @@ std::string MatchUtils::get_hex_string(std::string& str, bool use_names_as_is){
         }
         if(count == 0){
             count +=1;
-            tmp = char_to_hex_int[c];
+            tmp = char_to_hex_int[(int)c];
             continue;
         }
         //std::cout << (tmp<<4) << std::endl;
         //std::cout << char_to_hex_int[c] << std::endl;
         //std::cout << (tmp<<4 | char_to_hex_int[c]) << std::endl;
-        to_ret += (char) (tmp<<4 | char_to_hex_int[c]);
+        to_ret += (char) (tmp<<4 | char_to_hex_int[(int)c]);
         count = 0;    
     }
     if(count == 1){
@@ -350,14 +350,14 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
                 vector<Match> tmp;
                 all_matches.insert(pair<string, vector<Match> >(it2->first,tmp));
             }
-            for (int j = 0; j < it2->second.size(); ++j)
+            for (size_t j = 0; j < it2->second.size(); ++j)
             {
                 if(!it2->second[j].reduce){
                     // Check if edge is already in ourset of graph edges, Don't want duplicates
                     // Check the set indexed by the query read and then the target
                     bool found = false;
                     if(all_matches.count(it2->second[j].query_read_id) != 0){
-                        for(int k = 0; k < all_matches[it2->second[j].query_read_id].size(); k++){
+                        for(size_t k = 0; k < all_matches[it2->second[j].query_read_id].size(); k++){
                             if((all_matches[it2->second[j].query_read_id][k].query_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].query_read_id][k].target_read_id == it2->second[j].target_read_id) ||
                                 (all_matches[it2->second[j].query_read_id][k].target_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].query_read_id][k].query_read_id == it2->second[j].target_read_id)){
                                 found = true;
@@ -366,7 +366,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
                         }
                     }
                     if(!found && all_matches.count(it2->second[j].target_read_id) != 0){
-                        for(int k = 0; k < all_matches[it2->second[j].target_read_id].size(); k++){
+                        for(size_t k = 0; k < all_matches[it2->second[j].target_read_id].size(); k++){
                             if((all_matches[it2->second[j].target_read_id][k].query_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].target_read_id][k].target_read_id == it2->second[j].target_read_id) ||
                                 (all_matches[it2->second[j].target_read_id][k].target_read_id == it2->second[j].query_read_id && all_matches[it2->second[j].target_read_id][k].query_read_id == it2->second[j].target_read_id)){
                                 found = true;
@@ -385,7 +385,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::map<std::string, std::vect
     if(average_read_lens.size() > 0){
         int n = accumulate( total_reads.begin(), total_reads.end(), 0);
         int to_ret = 0;
-        for(int i = 0; i < average_read_lens.size(); i++){
+        for(size_t i = 0; i < average_read_lens.size(); i++){
             to_ret += average_read_lens[i] * static_cast<float>(total_reads[i])/n;
         }
         return to_ret;
@@ -456,7 +456,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
     if(average_read_lens.size() > 0){
         int n = accumulate( total_reads.begin(), total_reads.end(), 0);
         int to_ret = 0;
-        for(int i = 0; i < average_read_lens.size(); i++){
+        for(size_t i = 0; i < average_read_lens.size(); i++){
             to_ret += average_read_lens[i] * static_cast<float>(total_reads[i])/n;
         }
         mean_read_length = to_ret;
@@ -502,7 +502,6 @@ int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_ma
 	//ifstream inputFile_filter(file_name);
 	string line;
     set<string> to_drop;
-    int count = 0;
     cerr << "Checking for Contained Reads" << endl;
     get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name, true, use_names_as_is);
 	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
@@ -524,15 +523,15 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
     // Compute the size of each arm first, and keep the longest one
     int arm_to_keep = 0;
     std::vector<int> avg_len;
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
         int tmp = 0;
-        for (int j = 0; j < arms[i].size()-1; ++j)
+        for (std::size_t j = 0; j < arms[i].size()-1; ++j)
         {
             // Need to find the edge between these 2 reads
             if(arms[i][j] < arms[i][j+1]){
                 // Edge will be on j
-                for(int k = 0; k< all_matches[arms[i][j]].size(); k++){
+                for(std::size_t k = 0; k< all_matches[arms[i][j]].size(); k++){
                     if((all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1]) ||
                         (all_matches[arms[i][j]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j]][k].target_read_id == arms[i][j])){
                         if(j == 0){
@@ -548,7 +547,7 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
                 }
             } else {
                 // Edge will be on j+1
-                for(int k = 0; k< all_matches[arms[i][j+1]].size(); k++){
+                for(std::size_t k = 0; k< all_matches[arms[i][j+1]].size(); k++){
                     if((all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1]) ||
                         (all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j])){
                         if(j == 0){
@@ -566,25 +565,25 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
         }
         avg_len.push_back(tmp);
     }
-    for (int i = 0; i < avg_len.size(); ++i)
+    for (std::size_t i = 0; i < avg_len.size(); ++i)
     {
         if(avg_len[i] > avg_len[arm_to_keep]){
             arm_to_keep = i;
         }
     }
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
-        if(i == arm_to_keep){
+        if((int) i == arm_to_keep){
             continue;
         }
         //Remove this arm
-        for (int j = 0; j < arms[i].size()-1; ++j)
+        for (std::size_t j = 0; j < arms[i].size()-1; ++j)
         {
             // Edges are ordered so we should be able to find the respective edge in all matches and remove it
             std::string first = arms[i][j];
             std::string second = arms[i][j+1];
             if(first < second){
-                for(int k = 0; k < all_matches[first].size(); k++){
+                for(std::size_t k = 0; k < all_matches[first].size(); k++){
                     if(all_matches[first][k].query_read_id == second || all_matches[first][k].target_read_id == second){
                         all_matches[first][k].reduce = true;
                         //std::cout << "Reduced: "<< all_matches[first][k].query_read_id << " to " << all_matches[first][k].target_read_id << std::endl;
@@ -592,7 +591,7 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
                     }
                 }
             } else {
-                for(int k = 0; k < all_matches[second].size(); k++){
+                for(std::size_t k = 0; k < all_matches[second].size(); k++){
                     if(all_matches[second][k].query_read_id == first || all_matches[second][k].target_read_id == first){
                         all_matches[second][k].reduce = true;
                         //std::cout << "Reduced: "<< all_matches[second][k].query_read_id << " to " << all_matches[second][k].target_read_id << std::endl;
@@ -606,15 +605,15 @@ void MatchUtils::collapseBubble(std::vector<std::vector<std::string> >& arms, st
 
 float MatchUtils::getArmLengthRatio(std::vector<std::vector<std::string> >& arms, std::map<std::string, std::vector<Match> >& all_matches){
     std::vector<float> avg_len;
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
-        for (int j = 0; j < arms[i].size()-1; ++j)
+        for (std::size_t j = 0; j < arms[i].size()-1; ++j)
         {
             // Need to find the edge between these 2 reads
             if(arms[i][j] < arms[i][j+1]){
                 // Edge will be on j
-                for(int k = 0; k< all_matches[arms[i][j]].size(); k++){
+                for(std::size_t k = 0; k< all_matches[arms[i][j]].size(); k++){
                     if((all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1]) ||
                         (all_matches[arms[i][j]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j]][k].target_read_id == arms[i][j])){
                         if(j == 0){
@@ -630,7 +629,7 @@ float MatchUtils::getArmLengthRatio(std::vector<std::vector<std::string> >& arms
                 }
             } else {
                 // Edge will be on j+1
-                for(int k = 0; k< all_matches[arms[i][j+1]].size(); k++){
+                for(std::size_t k = 0; k< all_matches[arms[i][j+1]].size(); k++){
                     if((all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1]) ||
                         (all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j])){
                         if(j == 0){
@@ -654,14 +653,13 @@ float MatchUtils::getArmLengthRatio(std::vector<std::vector<std::string> >& arms
 float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, std::map<std::string, float>& read_coverage, std::map<std::string, int>& read_lengths){
     // Can see if there is drastic differences in coverage between the two arms, Assuming that short bubbles can be caused by a sequencing error
     // Smaller sequencing errors should have a lower coverage than true variation
-    bool valid = true;
     // We now have each arm of the bubble. Now can compute the coverage for each arm, as the average of the coverage for each read in the arm
     std::vector<float> avg_cov;
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
         int arm_size = 0;
-        for (int j = 0; j < arms[i].size(); ++j)
+        for (std::size_t j = 0; j < arms[i].size(); ++j)
         {
             tmp += (read_coverage[arms[i][j]] * read_lengths[arms[i][j]]);
             arm_size += read_lengths[arms[i][j]];
@@ -713,7 +711,7 @@ void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::str
                         // OR the read must have either 2 reads in or 2 out. 
                         // Only Modify the edges if the other read in the pair is also in the bubble
                         if(read_indegree[*it3].size() >= 2 && read_outdegree[*it3].size() != 0){
-                            for(int i = 0; i < read_indegree[*it3].size(); i++){
+                            for(std::size_t i = 0; i < read_indegree[*it3].size(); i++){
                                 string read_target = read_indegree[*it3][i];
                                 // Skip read if it is outside the big bubble
                                 if(it2->second.count(read_target) == 0 || read_target == (it2->first).first || read_target == (it2->first).second){
@@ -722,10 +720,10 @@ void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::str
                                 // Dont look at read_target's full indegree, only bubble specific
                                 int rt_in = 0;
                                 int rt_out = 0;
-                                for(int j = 0; j < read_indegree[read_target].size(); j++){
+                                for(std::size_t j = 0; j < read_indegree[read_target].size(); j++){
                                     rt_in += it2->second.count(read_indegree[read_target][j]);
                                 }
-                                for(int j = 0; j < read_outdegree[read_target].size(); j++){
+                                for(std::size_t j = 0; j < read_outdegree[read_target].size(); j++){
                                     rt_out += it2->second.count(read_outdegree[read_target][j]);
                                 }
                                 // If this read has multiple edges in and one of those edges is our current node
@@ -740,7 +738,7 @@ void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::str
                             }
                         }
                         if(read_indegree[*it3].size() != 0 && read_outdegree[*it3].size() >= 2){
-                            for(int i = 0; i < read_outdegree[*it3].size(); i++){
+                            for(std::size_t i = 0; i < read_outdegree[*it3].size(); i++){
                                 string read_target = read_outdegree[*it3][i];
                                 // Skip read if it is outside the big bubble
                                 if(it2->second.count(read_target) == 0 || read_target == (it2->first).first || read_target == (it2->first).second){
@@ -749,10 +747,10 @@ void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::str
                                 // Dont look at read_target's full indegree, only bubble specific
                                 int rt_in = 0;
                                 int rt_out = 0;
-                                for(int j = 0; j < read_indegree[read_target].size(); j++){
+                                for(std::size_t j = 0; j < read_indegree[read_target].size(); j++){
                                     rt_in += it2->second.count(read_indegree[read_target][j]);
                                 }
-                                for(int j = 0; j < read_outdegree[read_target].size(); j++){
+                                for(std::size_t j = 0; j < read_outdegree[read_target].size(); j++){
                                     rt_out += it2->second.count(read_outdegree[read_target][j]);
                                 }
                                 // If this read has multiple edges in and one of those edges is our current node
@@ -785,18 +783,18 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
 
     bool valid = false;
     vector<set<string> > arm_classifcation;
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
         set<string> tmp;
-        for (int j = 0; j < arms[i].size(); ++j)
+        for (std::size_t j = 0; j < arms[i].size(); ++j)
         {
             tmp.insert(read_lowest_taxonomy[arms[i][j]]);
         }
         arm_classifcation.push_back(tmp);
     }
     // Now compare the species in each arm to see if there are any that are shared. We should have at least one unique classification in each, ie. distinct sets
-    for(int i = 0; i < arm_classifcation.size(); i++){
-        for (int j = 0; j < arm_classifcation.size(); ++j)
+    for(std::size_t i = 0; i < arm_classifcation.size(); i++){
+        for (std::size_t j = 0; j < arm_classifcation.size(); ++j)
         {
             if(i == j){
                 continue;
@@ -822,11 +820,11 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
         //print = true;
     }
     std::vector<float> avg_cov;
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
         int arm_size = 0;
-        for (int j = 0; j < arms[i].size(); ++j)
+        for (std::size_t j = 0; j < arms[i].size(); ++j)
         {
             if(print){
                 std::cerr << "Coverage of " << arms[i][j] << " " << read_lengths[arms[i][j]] << " " << read_coverage[arms[i][j]] * read_lengths[arms[i][j]] << std::endl;
@@ -844,29 +842,29 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     // First get the species/subspecies in each arm using read_full_taxonomy
     // Want to also get the length of each arm as a contig at this spot at well
     std::vector<float> arm_tax_cov;
-    for (int i = 0; i < arms.size(); ++i)
+    for (std::size_t i = 0; i < arms.size(); ++i)
     {
         float tmp = 0.0;
         int arm_size = 0;
         if(binned){
             // Need to use all_matches here
-            for (int j = 0; j < arms[i].size()-1; ++j)
+            for (std::size_t j = 0; j < arms[i].size()-1; ++j)
             {
                 // First find the overlap between read j and j + 1
                 std::string species = "";
                 if(arms[i][j] < arms[i][j+1]){
-                    for(int k = 0; k < all_matches[arms[i][j]].size();k++){
-                        if(all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1] ||
-                            all_matches[arms[i][j]][k].target_read_id == arms[i][j] && all_matches[arms[i][j]][k].query_read_id == arms[i][j+1]){
+                    for(std::size_t k = 0; k < all_matches[arms[i][j]].size();k++){
+                        if((all_matches[arms[i][j]][k].query_read_id == arms[i][j] && all_matches[arms[i][j]][k].target_read_id == arms[i][j+1]) ||
+                            (all_matches[arms[i][j]][k].target_read_id == arms[i][j] && all_matches[arms[i][j]][k].query_read_id == arms[i][j+1])){
                             // Found match
                             species = all_matches[arms[i][j]][k].overlap_species;
                             break;
                         }
                     }
                 } else {
-                    for(int k = 0; k < all_matches[arms[i][j+1]].size();k++){
-                        if(all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1] ||
-                            all_matches[arms[i][j+1]][k].target_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1]){
+                    for(std::size_t k = 0; k < all_matches[arms[i][j+1]].size();k++){
+                        if((all_matches[arms[i][j+1]][k].query_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].target_read_id == arms[i][j+1]) ||
+                            (all_matches[arms[i][j+1]][k].target_read_id == arms[i][j] && all_matches[arms[i][j+1]][k].query_read_id == arms[i][j+1])){
                             // Found match
                             species = all_matches[arms[i][j+1]][k].overlap_species;
                             break;
@@ -877,7 +875,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
                 arm_size += (read_lengths[arms[i][j]]/2 + read_lengths[arms[i][j+1]]/2);
             }     
         } else {
-            for (int j = 0; j < arms[i].size(); ++j)
+            for (std::size_t j = 0; j < arms[i].size(); ++j)
             {
                 if(j == 0 || j == arms[i].size()-1){
                     tmp += per_species_coverage[read_levels[arms[i][j]]] * read_lengths[arms[i][j]]/2;
@@ -901,7 +899,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     // Now that we have the coverage for each arm, and the average coverage based on the taxonomic classifications of the reads in the arm, we can compare and see if they match what we should be seeing
     // Assumption is that each arm should have similar coverage as the species it comes from. If it does we call it a bubble
     std::vector<float> ratio_cov;
-    for (int i = 0; i < avg_cov.size(); ++i)
+    for (std::size_t i = 0; i < avg_cov.size(); ++i)
     {
         // Compare the average coverages between the arm itself and the species
         ratio_cov.push_back(avg_cov[i]/arm_tax_cov[i]);
@@ -946,7 +944,7 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
             // Pick longer of two reads plus added length
             len = std::max(it->second[0].target_read_length, it->second[0].query_read_length) + it->second[0].length;
         } else {
-            for (int i = 0; i < it->second.size(); ++i)
+            for (std::size_t i = 0; i < it->second.size(); ++i)
             {
                 if(i == 0){
                     // Know that we must have at least two edges, otherwise they wouldn't be included here
@@ -974,7 +972,7 @@ std::string MatchUtils::compute_n50(std::map<std::string, std::vector<Match> >& 
     sort(contig_lengths.begin(), contig_lengths.end(), greater<int>());
     int n50 = 0;
     int sum_len = 0;
-    for (int i = 0; i < contig_lengths.size(); ++i)
+    for (std::size_t i = 0; i < contig_lengths.size(); ++i)
     {
         sum_len += contig_lengths[i];
         //cout << sum_len << " " << contig_lengths[i] << " " << total_length << " " << sum_len/float(total_length) << endl;
@@ -1035,7 +1033,7 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
         if(it->second.size() == 1){
             len = std::max(it->second[0].target_read_length, it->second[0].query_read_length) + it->second[0].length;
         } else {
-            for (int i = 0; i < it->second.size(); ++i)
+            for (std::size_t i = 0; i < it->second.size(); ++i)
             {
                 if(i == 0){
                     if(it->second[i].length_to_use > 0){
@@ -1100,7 +1098,7 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
     {
         if(colours.size() > 0){
             set<string> cols;
-            for(int i=0; i<contigs_sets[it->first].size(); i++){
+            for(std::size_t i=0; i<contigs_sets[it->first].size(); i++){
                 if(colours[contigs_sets[it->first][i].query_read_id] != "#bebebe"){
                     cols.insert(colours[contigs_sets[it->first][i].query_read_id]);
                 }
@@ -1307,7 +1305,7 @@ void MatchUtils::collapse_contigs(std::map<std::string, std::vector<Match> >& al
     for (map<int, int>::iterator it = contig_lengths.begin(); it != contig_lengths.end(); ++it)
     {
         float tmp = 0;
-        for (int i = 0; i < contigs_sets[it->first].size(); ++i)
+        for (std::size_t i = 0; i < contigs_sets[it->first].size(); ++i)
         {
             tmp += contigs_sets[it->first][i].length * read_coverage[contigs_sets[it->first][i].query_read_id] * 0.5;
             tmp += contigs_sets[it->first][i].length * read_coverage[contigs_sets[it->first][i].target_read_id] * 0.5;
@@ -1364,7 +1362,7 @@ std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >&
             len = std::max(it->second[0].target_read_length, it->second[0].query_read_length) + it->second[0].length;
         }
         else {
-            for (int i = 0; i < it->second.size(); ++i)
+            for (std::size_t i = 0; i < it->second.size(); ++i)
             {
                 if(i == 0){
                     // Know that we must have at least two edges, otherwise they wouldn't be included here
@@ -1391,7 +1389,7 @@ std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >&
     sort(contig_lengths.begin(), contig_lengths.end(), greater<int>());
     int ng50 = 0;
     int sum_len = 0;
-    for (int i = 0; i < contig_lengths.size(); ++i)
+    for (std::size_t i = 0; i < contig_lengths.size(); ++i)
     {
         sum_len += contig_lengths[i];
         //cout << sum_len << " " << contig_lengths[i] << " " << total_length << " " << sum_len/float(total_length) << endl;
@@ -1408,7 +1406,7 @@ std::string MatchUtils::compute_ng50(std::map<std::string, std::vector<Match> >&
 void MatchUtils::subset_matches(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<Match> >& edge_lists, std::map<std::string, std::vector<Match> >& species_matches, std::map<std::string, std::vector<Match> >&  species_edge_lists, std::set<std::string> ids_to_use){
     for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it)
     {
-        for (int i = 0; i < it->second.size(); ++i)
+        for (std::size_t i = 0; i < it->second.size(); ++i)
         {
             if(ids_to_use.count(it->second[i].query_read_id) > 0 && ids_to_use.count(it->second[i].target_read_id) > 0){
                 if(species_matches.count(it->first) == 0){
@@ -1422,7 +1420,7 @@ void MatchUtils::subset_matches(std::map<std::string, std::vector<Match> >& all_
 
     for (std::map<std::string, std::vector<Match> >::iterator it=edge_lists.begin(); it!=edge_lists.end(); ++it)
     {
-        for (int i = 0; i < it->second.size(); ++i)
+        for (std::size_t i = 0; i < it->second.size(); ++i)
         {
             if(ids_to_use.count(it->second[i].query_read_id) > 0 && ids_to_use.count(it->second[i].target_read_id) > 0){
                 if(species_edge_lists.count(it->first) == 0){
@@ -1439,7 +1437,7 @@ void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_mat
     // First remove from all_matches
     //std::cout << "collapseBubble between "<< start << " " << end << std::endl;
     if(start < end){
-        for(int i =0; i < all_matches[start].size(); i++){
+        for(std::size_t i =0; i < all_matches[start].size(); i++){
             if(all_matches[start][i].query_read_id == start && all_matches[start][i].target_read_id == end){
                 all_matches[start][i].reduce = true;
                 break;
@@ -1449,7 +1447,7 @@ void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_mat
             }
         }
     } else {
-        for(int i =0; i < all_matches[end].size(); i++){
+        for(std::size_t i =0; i < all_matches[end].size(); i++){
             if(all_matches[end][i].query_read_id == start && all_matches[end][i].target_read_id == end){
                 all_matches[end][i].reduce = true;
                 break;
@@ -1463,7 +1461,7 @@ void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_mat
     // Remove edge from read_indegree and out_degree
     if(std::find(read_indegree[start].begin(), read_indegree[start].end(), end) != read_indegree[start].end()){
         std::vector<std::string> tmp;
-        for(int i = 0; i < read_indegree[start].size(); i++){
+        for(std::size_t i = 0; i < read_indegree[start].size(); i++){
             if(read_indegree[start][i] != end){
                 tmp.push_back(read_indegree[start][i]);
             }
@@ -1471,7 +1469,7 @@ void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_mat
         read_indegree[start] = tmp;
     } else if(std::find(read_outdegree[start].begin(), read_outdegree[start].end(), end) != read_outdegree[start].end()){
         std::vector<std::string> tmp;
-        for(int i = 0; i < read_outdegree[start].size(); i++){
+        for(std::size_t i = 0; i < read_outdegree[start].size(); i++){
             if(read_outdegree[start][i] != end){
                 tmp.push_back(read_outdegree[start][i]);
             }
@@ -1480,7 +1478,7 @@ void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_mat
     }
     if(std::find(read_indegree[end].begin(), read_indegree[end].end(), start) != read_indegree[end].end()){
         std::vector<std::string> tmp;
-        for(int i = 0; i < read_indegree[end].size(); i++){
+        for(std::size_t i = 0; i < read_indegree[end].size(); i++){
             if(read_indegree[end][i] != start){
                 tmp.push_back(read_indegree[end][i]);
             }
@@ -1488,7 +1486,7 @@ void MatchUtils::remove_edge(std::map<std::string, std::vector<Match> >& all_mat
         read_indegree[end] = tmp;
     } else if(std::find(read_outdegree[end].begin(), read_outdegree[end].end(), start) != read_outdegree[end].end()){
         std::vector<std::string> tmp;
-        for(int i = 0; i < read_outdegree[end].size(); i++){
+        for(std::size_t i = 0; i < read_outdegree[end].size(); i++){
             if(read_outdegree[end][i] != start){
                 tmp.push_back(read_outdegree[end][i]);
             }
@@ -1509,7 +1507,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
     //if(start == "1916" || start == "1807"){
     //    print = true;
     //}
-    for (int i = 0; i < start_ids.size(); ++i)
+    for (std::size_t i = 0; i < start_ids.size(); ++i)
     {   
         visited.insert(start_ids[i]);
         q.push_back(std::make_pair(start_ids[i], start));
@@ -1526,7 +1524,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
             check_outdegree = true;
         }
         if(check_outdegree){
-            for (int i = 0; i < read_outdegree[s.first].size(); ++i)
+            for (std::size_t i = 0; i < read_outdegree[s.first].size(); ++i)
             {
                 if(visited.count(read_outdegree[s.first][i]) == 0){
                     visited.insert(read_outdegree[s.first][i]);
@@ -1543,7 +1541,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                 }
             }
         } else {
-            for (int i = 0; i < read_indegree[s.first].size(); ++i)
+            for (std::size_t i = 0; i < read_indegree[s.first].size(); ++i)
             {
                 if(visited.count(read_indegree[s.first][i]) == 0){
                     visited.insert(read_indegree[s.first][i]);
@@ -1577,13 +1575,13 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
             visited_back.insert(end.first);
             // Need to check on the direction of our end node, see what the predacesor was and if it is in indegreee or outdegree
             if(std::find(read_indegree[end.first].begin(), read_indegree[end.first].end(), end.second) != read_indegree[end.first].end()){
-                for (int i = 0; i < read_indegree[end.first].size(); ++i)
+                for (std::size_t i = 0; i < read_indegree[end.first].size(); ++i)
                 {   
                     visited_back.insert(read_indegree[end.first][i]);
                     q.push_back(std::make_pair(read_indegree[end.first][i], end.first));
                 }
             } else {
-                for (int i = 0; i < read_outdegree[end.first].size(); ++i)
+                for (std::size_t i = 0; i < read_outdegree[end.first].size(); ++i)
                 {   
                     visited_back.insert(read_outdegree[end.first][i]);
                     q.push_back(std::make_pair(read_outdegree[end.first][i], end.first));
@@ -1602,7 +1600,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                     check_outdegree = true;
                 }
                 if(check_outdegree){
-                    for (int i = 0; i < read_outdegree[e.first].size(); ++i)
+                    for (std::size_t i = 0; i < read_outdegree[e.first].size(); ++i)
                     {
                         if(visited_back.count(read_outdegree[e.first][i]) == 0){
                             visited_back.insert(read_outdegree[e.first][i]);
@@ -1623,7 +1621,7 @@ void MatchUtils::find_bubble(std::string start, std::map<std::string,std::vector
                         }
                     }
                 } else {
-                    for (int i = 0; i < read_indegree[e.first].size(); ++i)
+                    for (std::size_t i = 0; i < read_indegree[e.first].size(); ++i)
                     {
                         if(visited_back.count(read_indegree[e.first][i]) == 0){
                             visited_back.insert(read_indegree[e.first][i]);
@@ -1676,7 +1674,7 @@ int recurse_bubble_arm(std::string id, std::string end, std::set<std::string> re
     // First check which direction we came in on, ie look at the last node in tmp_arms[path_num]
     // Want to leave in opposite direction, If we came in via reads indegree, leave on outdgree
     if(std::find(read_indegree[id].begin(), read_indegree[id].end(), prev) == read_indegree[id].end()){
-    	for(int i = 0; i < read_indegree[id].size(); i++){
+    	for(std::size_t i = 0; i < read_indegree[id].size(); i++){
             if(reads.count(read_indegree[id][i]) > 0){
                 if(std::find(tmp_arms[path_num].begin(), tmp_arms[path_num].end(), read_indegree[id][i]) == tmp_arms[path_num].end()){
     				// Id is in our read set and we haven't taken it
@@ -1688,7 +1686,7 @@ int recurse_bubble_arm(std::string id, std::string end, std::set<std::string> re
             }
         }
     } else {
-	    for(int i = 0; i < read_outdegree[id].size(); i++){
+	    for(std::size_t i = 0; i < read_outdegree[id].size(); i++){
 	        if(reads.count(read_outdegree[id][i]) > 0){
 	            if(std::find(tmp_arms[path_num].begin(), tmp_arms[path_num].end(), read_outdegree[id][i]) == tmp_arms[path_num].end()){
 					// Id is in our read set and we haven't taken it
@@ -1730,8 +1728,8 @@ int recurse_bubble_arm(std::string id, std::string end, std::set<std::string> re
             }
             tmp_path_num = recurse_bubble_arm(ids_to_take[0], end, reads, read_indegree, read_outdegree, tmp_arms, tmp_path_num, id);
         }
-        for(int i = 1; i < ids_to_take.size(); i++){
-            if(tmp_arms.size() == tmp_path_num + 1){
+        for(std::size_t i = 1; i < ids_to_take.size(); i++){
+            if((int) tmp_arms.size() == tmp_path_num + 1){
                 // Need to create a new vector that is a copy of current path and
                 std::vector<std::string> tmp = path_so_far;
                 tmp_arms.push_back(tmp);
@@ -1765,7 +1763,7 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
     //}
     if(read_indegree[start].size() > 1){
         std::vector<std::vector<std::string>> tmp_arms;
-        for(int i = 0; i < read_indegree[start].size(); i++){
+        for(std::size_t i = 0; i < read_indegree[start].size(); i++){
             if(reads.count(read_indegree[start][i]) > 0){
                 // Edge is valid, take it
                 std::vector<std::string> tmp;
@@ -1779,15 +1777,15 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
         std::map<int, int> ms_count;
         if(print){
             std::cerr << "Arms:" << std::endl;
-            for(int i = 0; i < tmp_arms.size(); i++){
-                for(int j = 0; j < tmp_arms[i].size(); j++){
+            for(std::size_t i = 0; i < tmp_arms.size(); i++){
+                for(std::size_t j = 0; j < tmp_arms[i].size(); j++){
                     std::cerr << tmp_arms[i][j] << " ";
                 }
                 std::cerr << std::endl;
             }
             std::cerr << std::endl;
         }
-        for(int i = 0; i < tmp_arms.size(); i++){
+        for(std::size_t i = 0; i < tmp_arms.size(); i++){
             // Check if we get to the end in each arm of temp_arms
             ms_count.insert(std::make_pair(i,0));
             if(std::find(tmp_arms[i].begin(), tmp_arms[i].end(), end) == tmp_arms[i].end()){
@@ -1811,7 +1809,7 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
             return;
         }
         if(keep_count == 2){
-            for(int i = 0; i < tmp_arms.size(); i++){
+            for(std::size_t i = 0; i < tmp_arms.size(); i++){
                 if(to_keep[i]){
                     arms.push_back(tmp_arms[i]);
                 }
@@ -1819,8 +1817,8 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
             return;
         }
         // now check for mutually exclusive arms, remove start and end points from each arm and see
-        for(int i = 0; i< tmp_arms.size(); i++){
-            for(int j = 1; j< tmp_arms.size(); j++){
+        for(std::size_t i = 0; i< tmp_arms.size(); i++){
+            for(std::size_t j = 1; j< tmp_arms.size(); j++){
                 if(j <= i){
                     // either seen this combination or both are same
                     continue;
@@ -1843,12 +1841,12 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
         }
         // Now find all arms that have the maximum count
         int max_val = 0;
-        for(int i = 0; i < tmp_arms.size(); i++){
+        for(std::size_t i = 0; i < tmp_arms.size(); i++){
             if(ms_count[i] > max_val){
                 max_val = ms_count[i];
             }
         }
-        for(int i = 0; i < tmp_arms.size(); i++){
+        for(std::size_t i = 0; i < tmp_arms.size(); i++){
             if(ms_count[i] == max_val){
                 arms.push_back(tmp_arms[i]);
             }
@@ -1858,7 +1856,7 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
     if(read_outdegree[start].size() > 1 && arms.size() == 0){
         // If there are arms then we must have hit the end from paths above, no need to check outdegree for this bubble
         std::vector<std::vector<std::string>> tmp_arms;
-        for(int i = 0; i < read_outdegree[start].size(); i++){
+        for(std::size_t i = 0; i < read_outdegree[start].size(); i++){
             if(reads.count(read_outdegree[start][i]) > 0){
                 // Edge is valid, take it
                 std::vector<std::string> tmp;
@@ -1872,15 +1870,15 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
         std::map<int, int> ms_count;
         if(print){
             std::cerr << "Arms:" << std::endl;
-            for(int i = 0; i < tmp_arms.size(); i++){
-                for(int j = 0; j < tmp_arms[i].size(); j++){
+            for(std::size_t i = 0; i < tmp_arms.size(); i++){
+                for(std::size_t j = 0; j < tmp_arms[i].size(); j++){
                     std::cerr << tmp_arms[i][j] << " ";
                 }
                 std::cerr << std::endl;
             }
             std::cerr << std::endl;
         }
-        for(int i = 0; i < tmp_arms.size(); i++){
+        for(std::size_t i = 0; i < tmp_arms.size(); i++){
             // Check if we get to the end in each arm of temp_arms
             ms_count.insert(std::make_pair(i,0));
             if(std::find(tmp_arms[i].begin(), tmp_arms[i].end(), end) == tmp_arms[i].end()){
@@ -1904,15 +1902,15 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
             return;
         }
         if(keep_count == 2){
-            for(int i = 0; i < tmp_arms.size(); i++){
+            for(std::size_t i = 0; i < tmp_arms.size(); i++){
                 if(to_keep[i]){
                     arms.push_back(tmp_arms[i]);
                 }
             }
             return;
         }
-        for(int i = 0; i< tmp_arms.size(); i++){
-            for(int j = 1; j< tmp_arms.size(); j++){
+        for(std::size_t i = 0; i< tmp_arms.size(); i++){
+            for(std::size_t j = 1; j< tmp_arms.size(); j++){
                 if(j <= i){
                     // either seen this combination or both are same
                     continue;
@@ -1935,12 +1933,12 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
         }
         // Now find all arms that have the maximum count
         int max_val = 0;
-        for(int i = 0; i < tmp_arms.size(); i++){
+        for(std::size_t i = 0; i < tmp_arms.size(); i++){
             if(ms_count[i] > max_val){
                 max_val = ms_count[i];
             }
         }
-        for(int i = 0; i < tmp_arms.size(); i++){
+        for(std::size_t i = 0; i < tmp_arms.size(); i++){
             if(ms_count[i] == max_val){
                 arms.push_back(tmp_arms[i]);
             }
@@ -1957,7 +1955,7 @@ bool MatchUtils::check_bubble(std::string start, std::string end, std::set<std::
             // These are the exception nodes, they should be connected to other things in our graph
             continue;
         }
-        for (int i = 0; i < read_indegree[*it].size(); ++i)
+        for (std::size_t i = 0; i < read_indegree[*it].size(); ++i)
         {
             if(reads.count(read_indegree[*it][i]) == 0){
                 // read at *it has an edge to something that isn't in our read set
@@ -1965,7 +1963,7 @@ bool MatchUtils::check_bubble(std::string start, std::string end, std::set<std::
                 return false;
             }
         }
-        for (int i = 0; i < read_outdegree[*it].size(); ++i)
+        for (std::size_t i = 0; i < read_outdegree[*it].size(); ++i)
         {
             if(reads.count(read_outdegree[*it][i]) == 0){
                 // read at *it has an edge to something that isn't in our read set
@@ -1989,7 +1987,7 @@ void MatchUtils::compute_sets(std::map<std::string, std::vector<Match> >& all_ma
         return;
     }
     seen.insert(current);
-    for (int i = 0; i < all_matches[current].size(); ++i)
+    for (std::size_t i = 0; i < all_matches[current].size(); ++i)
     {
         if(!all_matches[current][i].reduce){
             MatchUtils::compute_sets(all_matches, start, all_matches[current][i].target_read_id, end, bubble_sets, seen);
@@ -2007,7 +2005,7 @@ void MatchUtils::compute_in_out_degree(std::map<std::string, std::vector<Match> 
     }
     for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it)
     {
-        for (int i = 0; i < it->second.size(); ++i)
+        for (std::size_t i = 0; i < it->second.size(); ++i)
         {
             if(!it->second[i].reduce){
                 if(it->second[i].strand == '+'){
@@ -2072,7 +2070,7 @@ void get_path_to_branch(std::map<std::string, std::vector<Match> >& all_matches,
 	        return;
 	    }
 	    std::vector<std::string> tmp;
-	    for (int i = 0; i < read_outdegree[id].size(); ++i)
+	    for (std::size_t i = 0; i < read_outdegree[id].size(); ++i)
 	    {
             if(tmp.size() == 0){
                 get_path_to_branch(all_matches, tmp, read_outdegree[id][i], id, read_indegree, read_outdegree);
@@ -2097,7 +2095,7 @@ void get_path_to_branch(std::map<std::string, std::vector<Match> >& all_matches,
 	        return;
 	    }
 	    std::vector<std::string> tmp;
-	    for (int i = 0; i < read_indegree[id].size(); ++i)
+	    for (std::size_t i = 0; i < read_indegree[id].size(); ++i)
 	    {
             if(tmp.size() == 0){
                 get_path_to_branch(all_matches, tmp, read_indegree[id][i], id, read_indegree, read_outdegree);
@@ -2181,12 +2179,12 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
         //std::cout << it->first << std::endl;
         if(it->second.size() == 1){
             // Branch is a dead end, look at all the neighbors is has, if any of them are dead ends too, remove the edge
-            for (int i = 0; i < read_indegree[it->first].size(); ++i)
+            for (std::size_t i = 0; i < read_indegree[it->first].size(); ++i)
             {
                 // for each branch check to see if its neighbors are also dead ends 
                 if(read_indegree[read_indegree[it->first][i]].size() == 0 || read_outdegree[read_indegree[it->first][i]].size() == 0){
                     if(it->first < read_indegree[it->first][i]){
-                        for (int j = 0; j < all_matches[it->first].size(); ++j)
+                        for (std::size_t j = 0; j < all_matches[it->first].size(); ++j)
                         {
                             if(all_matches[it->first][j].target_read_id == read_indegree[it->first][i] || all_matches[it->first][j].query_read_id == read_indegree[it->first][i]){
                                 all_matches[it->first][j].reduce = true;
@@ -2194,7 +2192,7 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
                             }
                         }
                     } else {
-                        for (int j = 0; j < all_matches[read_indegree[it->first][i]].size(); ++j)
+                        for (std::size_t j = 0; j < all_matches[read_indegree[it->first][i]].size(); ++j)
                         {
                             if(all_matches[read_indegree[it->first][i]][j].target_read_id == it->first || all_matches[read_indegree[it->first][i]][j].query_read_id == it->first){
                                 all_matches[read_indegree[it->first][i]][j].reduce = true;
@@ -2204,12 +2202,12 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
                     }
                 }
             }
-            for (int i = 0; i < read_outdegree[it->first].size(); ++i)
+            for (std::size_t i = 0; i < read_outdegree[it->first].size(); ++i)
             {
                 if(read_outdegree[read_outdegree[it->first][i]].size() == 0 || read_indegree[read_outdegree[it->first][i]].size() == 0){
                     
                     if(it->first < read_outdegree[it->first][i]){
-                        for (int j = 0; j < all_matches[it->first].size(); ++j)
+                        for (std::size_t j = 0; j < all_matches[it->first].size(); ++j)
                         {
                             if(all_matches[it->first][j].target_read_id == read_outdegree[it->first][i] || all_matches[it->first][j].query_read_id == read_outdegree[it->first][i]){
                                 all_matches[it->first][j].reduce = true;
@@ -2217,7 +2215,7 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
                             }
                         }
                     } else {
-                        for (int j = 0; j < all_matches[read_outdegree[it->first][i]].size(); ++j)
+                        for (std::size_t j = 0; j < all_matches[read_outdegree[it->first][i]].size(); ++j)
                         {
                             if(all_matches[read_outdegree[it->first][i]][j].target_read_id == it->first || all_matches[read_outdegree[it->first][i]][j].query_read_id == it->first){
                                 all_matches[read_outdegree[it->first][i]][j].reduce = true;
@@ -2231,12 +2229,12 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
             continue;
         } else if(branch_count[it->second[it->second.size() - 1]].size() > 1){
             // Have more than one dead end at this branch, check if it is the largest
-            if(it->second.size() < *std::max_element( branch_count[it->second[it->second.size() - 1]].begin(), branch_count[it->second[it->second.size() - 1]].end() )){
+            if((int) it->second.size() < *std::max_element( branch_count[it->second[it->second.size() - 1]].begin(), branch_count[it->second[it->second.size() - 1]].end() )){
                 // Not the largest path to a dead end out of this branch, so remove it
-                for (int i = 0; i < it->second.size()-1; ++i)
+                for (std::size_t i = 0; i < it->second.size()-1; ++i)
                 {
                     if(it->second[i] < it->second[i+1]){
-                        for (int j = 0; j < all_matches[it->second[i]].size(); ++j)
+                        for (std::size_t j = 0; j < all_matches[it->second[i]].size(); ++j)
                         {
                             if(all_matches[it->second[i]][j].target_read_id == it->second[i+1] || all_matches[it->second[i]][j].query_read_id == it->second[i+1]){
                                 all_matches[it->second[i]][j].reduce = true;
@@ -2244,7 +2242,7 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
                             }
                         }
                     } else {
-                        for (int j = 0; j < all_matches[it->second[i+1]].size(); ++j)
+                        for (std::size_t j = 0; j < all_matches[it->second[i+1]].size(); ++j)
                         {
                             if(all_matches[it->second[i+1]][j].target_read_id == it->second[i] || all_matches[it->second[i+1]][j].query_read_id == it->second[i]){
                                 all_matches[it->second[i+1]][j].reduce = true;
@@ -2259,14 +2257,14 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
         // check the length of the branch
         int size = 0;
         bool larger = false;
-        for (int i = 0; i < it->second.size()-1; ++i)
+        for (std::size_t i = 0; i < it->second.size()-1; ++i)
         {   
             if(size > threshold*mean_read_length){
                 larger = true;
                 break;
             }
             if(it->second[i] < it->second[i+1]){
-                for (int j = 0; j < all_matches[it->second[i]].size(); ++j)
+                for (std::size_t j = 0; j < all_matches[it->second[i]].size(); ++j)
                 {
                     if(all_matches[it->second[i]][j].target_read_id == it->second[i+1]){
                         size += all_matches[it->second[i]][j].suffix_length;
@@ -2275,7 +2273,7 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
                     }
                 }
             } else {
-                for (int j = 0; j < all_matches[it->second[i+1]].size(); ++j)
+                for (std::size_t j = 0; j < all_matches[it->second[i+1]].size(); ++j)
                 {
                     if(all_matches[it->second[i+1]][j].target_read_id == it->second[i]){
                         size += all_matches[it->second[i+1]][j].suffix_length;
@@ -2286,10 +2284,10 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
             }
         }
         if(!larger){
-            for (int i = 0; i < it->second.size()-1; ++i)
+            for (std::size_t i = 0; i < it->second.size()-1; ++i)
             {
                 if(it->second[i] < it->second[i+1]){
-                    for (int j = 0; j < all_matches[it->second[i]].size(); ++j)
+                    for (std::size_t j = 0; j < all_matches[it->second[i]].size(); ++j)
                     {
                         if(all_matches[it->second[i]][j].target_read_id == it->second[i+1] || all_matches[it->second[i]][j].query_read_id == it->second[i+1]){
                             all_matches[it->second[i]][j].reduce = true;
@@ -2297,7 +2295,7 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
                         }
                     }
                 } else {
-                    for (int j = 0; j < all_matches[it->second[i+1]].size(); ++j)
+                    for (std::size_t j = 0; j < all_matches[it->second[i+1]].size(); ++j)
                     {
                         if(all_matches[it->second[i+1]][j].target_read_id == it->second[i] || all_matches[it->second[i+1]][j].query_read_id == it->second[i]){
                             all_matches[it->second[i+1]][j].reduce = true;
@@ -2314,9 +2312,8 @@ int MatchUtils::prune_dead_paths(std::map<std::string, std::vector<Match> >& all
 
 void MatchUtils::clean_matches(std::map<std::string, std::vector<Match> >& all_matches){
     std::map<std::string, std::vector<Match> > new_matches;
-    int count = 0;
     for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it){
-        for (int i = 0; i < it->second.size(); ++i){
+        for (std::size_t i = 0; i < it->second.size(); ++i){
             Match val = it->second[i];
             if(!val.reduce){
 	            if(new_matches.count(val.query_read_id) == 0){
@@ -2351,7 +2348,7 @@ int MatchUtils::mark_matches_for_node(std::map<std::string, std::vector<Match> >
 		// compare v and w. If v < w then deal with it in the second section
 		// if v > w then we iterate through w's edges and find v and reduce it
 		if(id > it->first){
-			for (int i = 0; i < all_matches[it->first].size(); ++i){
+			for (std::size_t i = 0; i < all_matches[it->first].size(); ++i){
 				if(all_matches[it->first][i].query_read_id == id || all_matches[it->first][i].target_read_id == id){
 					if(!all_matches[it->first][i].reduce){
 						count++;
@@ -2362,7 +2359,7 @@ int MatchUtils::mark_matches_for_node(std::map<std::string, std::vector<Match> >
 			}
 		}
 	}
-	for (int i = 0; i < all_matches[id].size(); ++i){
+	for (std::size_t i = 0; i < all_matches[id].size(); ++i){
 		if(all_matches[id][i].query_read_id == id){
 			if(mark[all_matches[id][i].target_read_id] == -1){
 				if(!all_matches[id][i].reduce){
@@ -2386,7 +2383,7 @@ int MatchUtils::mark_matches_for_node(std::map<std::string, std::vector<Match> >
 bool check_contigs_for_match(std::string& id, std::string& id2, std::map<int, std::vector<Match> >& contig_map){
     for (std::map<int,std::vector<Match> >::iterator it = contig_map.begin(); it != contig_map.end(); ++it)
     {
-        for(int i = 0; i < it->second.size(); i++){
+        for(std::size_t i = 0; i < it->second.size(); i++){
             if(id == it->second[i].target_read_id && id2 == it->second[i].query_read_id){
                 return true;
             }
@@ -2401,7 +2398,7 @@ bool check_contigs_for_match(std::string& id, std::string& id2, std::map<int, st
 void get_matches_for_contig(std::string& id, std::string& id2, std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string,std::vector<std::string> >& read_indegree, std::map<std::string,std::vector<std::string> >& read_outdegree, std::vector<Match>& tmp){
     // Always going from id to id2
     // First check that we haven't already visted this edge before for the same contig (Circular contigs specifically)
-    for(int i = 0; i < tmp.size(); i++){
+    for(std::size_t i = 0; i < tmp.size(); i++){
         if ((id == tmp[i].target_read_id && id2 == tmp[i].query_read_id) || (id2 == tmp[i].target_read_id && id == tmp[i].query_read_id)){
             return;
         }
@@ -2409,13 +2406,13 @@ void get_matches_for_contig(std::string& id, std::string& id2, std::map<std::str
     // Second locate the edge from id to id2, and add it to the vector
     // Sorted by lexographically smaller value
     if(id < id2){
-        for(int i = 0; i < all_matches[id].size(); i++){
+        for(std::size_t i = 0; i < all_matches[id].size(); i++){
             if ((id == all_matches[id][i].target_read_id && id2 == all_matches[id][i].query_read_id) || (id2 == all_matches[id][i].target_read_id && id == all_matches[id][i].query_read_id)){
                 tmp.push_back(all_matches[id][i]);
             }
         }
     } else {
-        for(int i = 0; i < all_matches[id2].size(); i++){
+        for(std::size_t i = 0; i < all_matches[id2].size(); i++){
             if ((id == all_matches[id2][i].target_read_id && id2 == all_matches[id2][i].query_read_id) || (id2 == all_matches[id2][i].target_read_id && id == all_matches[id2][i].query_read_id)){
                 tmp.push_back(all_matches[id2][i]);
             }
@@ -2446,7 +2443,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
         // Iterate over each branch
         //std::cerr << "Indegree of 2 or more or dead end on outdegree for " << id << std::endl;
         int count_already_matched = 0;
-        for(int i = 0; i < read_indegree[id].size(); i++){
+        for(std::size_t i = 0; i < read_indegree[id].size(); i++){
             // Check if branch has already been taken from other direction
             if(!check_contigs_for_match(id, read_indegree[id][i], contig_map)){
                 // Get vector of overlaps and save as a contig
@@ -2462,7 +2459,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
         }
         // Have the case where the outdegree can be > 0.
         if(read_outdegree[id].size() >= 1){
-            for(int i = 0; i < read_outdegree[id].size(); i++){
+            for(std::size_t i = 0; i < read_outdegree[id].size(); i++){
                 // Check if branch has already been taken from other direction
                 if(!check_contigs_for_match(id, read_outdegree[id][i], contig_map)){
                     // Get vector of overlaps and save as a contig
@@ -2476,11 +2473,11 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
             }
         }
         // Here we have the case where a read is a branch and dead end. ie the end of a bubble. But it needs to be its own contig
-        if((read_outdegree[id].size() == 0 && read_indegree[id].size() >=2) && count_already_matched == read_indegree[id].size()){
+        if((read_outdegree[id].size() == 0 && (int) read_indegree[id].size() >=2) && count_already_matched == (int) read_indegree[id].size()){
             std::string id2 = read_indegree[id][0];
             std::vector<Match> tmp;
             if(id < id2){
-                for(int i = 0; i < all_matches[id].size(); i++){
+                for(std::size_t i = 0; i < all_matches[id].size(); i++){
                     if ((id == all_matches[id][i].target_read_id && id2 == all_matches[id][i].query_read_id) || (id2 == all_matches[id][i].target_read_id && id == all_matches[id][i].query_read_id)){
                         Match tmp_match = all_matches[id][i];
                         // Want to make sure we use the correct length
@@ -2493,7 +2490,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
                     }
                 }
             } else {
-                for(int i = 0; i < all_matches[id2].size(); i++){
+                for(std::size_t i = 0; i < all_matches[id2].size(); i++){
                     if ((id == all_matches[id2][i].target_read_id && id2 == all_matches[id2][i].query_read_id) || (id2 == all_matches[id2][i].target_read_id && id == all_matches[id2][i].query_read_id)){
                         Match tmp_match = all_matches[id2][i];
                         // Want to make sure we use the correct length
@@ -2513,7 +2510,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
     if((read_outdegree[id].size() >= 2) || (read_indegree[id].size() == 0 && read_outdegree[id].size() >=1)){
         //std::cerr << "Outdegree of 2 or more or dead end on indegree for " << id << std::endl;
         int count_already_matched = 0;
-        for(int i = 0; i < read_outdegree[id].size(); i++){
+        for(std::size_t i = 0; i < read_outdegree[id].size(); i++){
             // Check if branch has already been taken from other direction
             if(!check_contigs_for_match(id, read_outdegree[id][i], contig_map)){
                 // Get vector of overlaps and save as a contig
@@ -2529,7 +2526,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
         }
         // Have the case where the outdegree can be > 0.
         if(read_indegree[id].size() >= 1){
-            for(int i = 0; i < read_indegree[id].size(); i++){
+            for(std::size_t i = 0; i < read_indegree[id].size(); i++){
                 // Check if branch has already been taken from other direction
                 if(!check_contigs_for_match(id, read_indegree[id][i], contig_map)){
                     // Get vector of overlaps and save as a contig
@@ -2542,11 +2539,11 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
                 }
             }
         }
-        if((read_indegree[id].size() == 0 && read_outdegree[id].size() >=2) && count_already_matched == read_outdegree[id].size()){
+        if((read_indegree[id].size() == 0 && (int) read_outdegree[id].size() >=2) && count_already_matched == (int) read_outdegree[id].size()){
             std::string id2 = read_outdegree[id][0];
             std::vector<Match> tmp;
             if(id < id2){
-                for(int i = 0; i < all_matches[id].size(); i++){
+                for(std::size_t i = 0; i < all_matches[id].size(); i++){
                     if ((id == all_matches[id][i].target_read_id && id2 == all_matches[id][i].query_read_id) || (id2 == all_matches[id][i].target_read_id && id == all_matches[id][i].query_read_id)){
                         Match tmp_match = all_matches[id][i];
                         // Want to make sure we use the correct length
@@ -2559,7 +2556,7 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
                     }
                 }
             } else {
-                for(int i = 0; i < all_matches[id2].size(); i++){
+                for(std::size_t i = 0; i < all_matches[id2].size(); i++){
                     if ((id == all_matches[id2][i].target_read_id && id2 == all_matches[id2][i].query_read_id) || (id2 == all_matches[id2][i].target_read_id && id == all_matches[id2][i].query_read_id)){
                         Match tmp_match = all_matches[id2][i];
                         // Want to make sure we use the correct length
@@ -2582,11 +2579,11 @@ int MatchUtils::compute_contigs(std::string id, std::map<std::string, std::vecto
 std::vector<Match> get_all_matches_for_node(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::string v){
     std::vector<Match> tmp;
     // First get all v
-    for (int i = 0; i < all_matches[v].size(); ++i){
+    for (std::size_t i = 0; i < all_matches[v].size(); ++i){
     	tmp.push_back(all_matches[v][i]);
     }
-    for(int j = 0; j < matches_indexed[v].size(); j++){
-        for (int i = 0; i < all_matches[matches_indexed[v][j]].size(); ++i){
+    for(std::size_t j = 0; j < matches_indexed[v].size(); j++){
+        for (std::size_t i = 0; i < all_matches[matches_indexed[v][j]].size(); ++i){
             if(all_matches[matches_indexed[v][j]][i].query_read_id == v){
                 tmp.push_back(all_matches[matches_indexed[v][j]][i]);
             } else if (all_matches[matches_indexed[v][j]][i].target_read_id == v){
@@ -2617,7 +2614,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, matches_indexed ,v);
         int flongest = 0;
         int rlongest = 0;
-        for (int i = 0; i < v_to_w.size(); ++i)
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
         {	
         	// First compute the suffix/edge length and store it in the match, relative to a specific read
         	// Needed so we can sort by increasing distance
@@ -2635,7 +2632,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         	}
         }
         //Match::sort_matches(v_to_w);
-        for (int i = 0; i < v_to_w.size(); ++i)
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
         {
         	//if(v_to_w[i].reduce){
         	//	continue;
@@ -2649,7 +2646,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         }
         flongest += fuzz;
         rlongest += fuzz;
-        for (int i = 0; i < v_to_w.size(); ++i)
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
         {
         	int longest = 0;
         	//if(v_to_w[i].reduce){
@@ -2679,7 +2676,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
                 	//std::cerr << v << " to " << w_to_x[j].query_read_id << " " << w_to_x[j].target_read_id << " " << v_to_w[i].suffix_length + w_to_x[j].suffix_length << " " << longest << std::endl;
                 //}
                 //Match::sort_matches(w_to_x);
-                for (int j = 0; j < w_to_x.size(); ++j)
+                for (std::size_t j = 0; j < w_to_x.size(); ++j)
                 {
 		            //if(w_to_x[j].reduce){ // ||w_to_x[j].orientation != v_to_w[i].orientation){
 		            	// v to w is in one direction, but w to x is in the wrong direction, so ignore it
@@ -2735,7 +2732,7 @@ void MatchUtils::reduce_edges(std::map<std::string, std::vector<Match> >& all_ma
         }
 
         count += MatchUtils::mark_matches_for_node(all_matches, v, mark);
-        for (int i = 0; i < v_to_w.size(); ++i)
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
         {
         	if(v_to_w[i].reduce){
         		continue;
@@ -2761,7 +2758,7 @@ void MatchUtils::toGfa(std::map<std::string, std::vector<Match> >& all_matches, 
         }
   	}
   	for (std::map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it){
-  		for (int i = 0; i < it->second.size(); ++i)
+  		for (std::size_t i = 0; i < it->second.size(); ++i)
   		{
   			//std::cerr << it->second[i].query_read_id << " To " << it->second[i].target_read_id << " " << it->second[i].reduce << std::endl;
   			if(!it->second[i].reduce){

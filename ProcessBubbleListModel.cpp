@@ -118,7 +118,12 @@ int main(int argc, char** argv) {
         split(line, '\t', row);
         float score = stof(row[0]);
         int num_reads = stoi(row[1]);
+        int true_bubble = stoi(row[2]);
+        float tax_and_cov_1 = stof(row[3]);
+        float tax_and_cov_2 = stof(row[4]);
         int diff_tax = stoi(row[5]);
+        float cov_only = stof(row[6]);
+        float arm_ratio = stof(row[7]);
 
         cout << score << endl;
 
@@ -211,7 +216,7 @@ int main(int argc, char** argv) {
 
 
         // bubble start and end will be same for both arm
-        output << score << "\t" << num_reads << "\t" << diff_tax << "\t" << arm1_uniuqe_s1 << "\t" << arm1_uniuqe_s2 << "\t" << arm1_both << "\t" << arm1_neither << "\t" << arm2_uniuqe_s1 << "\t" << arm2_uniuqe_s2 << "\t" << arm2_both << "\t" << arm2_neither << "\t" << start_in_s1 << "\t" << start_in_s2 << "\t" << end_in_s1 << "\t" << end_in_s2 <<"\n";
+        output << num_reads << "\t" << true_bubble << "\t" << tax_and_cov_1 << "\t" << tax_and_cov_2 << "\t" << diff_tax << "\t" << cov_only << "\t" << arm_ratio << "\t" << arm1_uniuqe_s1 << "\t" << arm1_uniuqe_s2 << "\t" << arm1_both << "\t" << arm1_neither << "\t" << arm2_uniuqe_s1 << "\t" << arm2_uniuqe_s2 << "\t" << arm2_both << "\t" << arm2_neither << "\t" << start_in_s1 << "\t" << start_in_s2 << "\t" << end_in_s1 << "\t" << end_in_s2 <<"\n";
      }
 
      output.close();

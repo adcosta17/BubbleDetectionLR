@@ -136,7 +136,6 @@ int main(int argc, char** argv)
 
     // Take the list of paf_files and then for each of them read in the file
     cerr << "Combining files" << endl;
-    int count = 0;
     string output_file = argv[2];
     gzFile tmp_file = gzopen(output_file.c_str(),"ab");
     for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {

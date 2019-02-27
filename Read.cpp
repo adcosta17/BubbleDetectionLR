@@ -32,7 +32,7 @@ Read::Read(std::string i,
 	}
 
 void Read::setTaxonomy(std::vector<std::string>& tmp){
-	for (int i = 0; i < tmp.size(); ++i)
+	for (std::size_t i = 0; i < tmp.size(); ++i)
 	{
 		if(tmp[i].length() > 3){
 			char tax = tmp[i].at(0);

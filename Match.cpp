@@ -97,7 +97,6 @@ void Match::sort_matches(std::vector<Match>& matches)
 int Match::check_match_contained()
 {
 	int tl5, tl3, ext5, ext3;
-	uint32_t u, v, l;
 	int max_hang = 1000;
 	if (strand == '-'){
 		tl5 = target_read_length - target_read_end;
@@ -113,8 +112,6 @@ int Match::check_match_contained()
 	}
 	if (query_read_start <= tl5 && query_read_length - query_read_end <= tl3) return -1; // query contained
 	else if (query_read_start >= tl5 && query_read_length - query_read_end >= tl3) return 1; // target contained
-	else if (query_read_start > tl5) u = 0, v = (strand == '-')? 1 : 0, l = query_read_start - tl5;
-	else u = 1, v = (strand == '+')? 1 : 0, l = (query_read_length - query_read_end) - tl3;
 	if (query_read_end - query_read_start + ext5 + ext3 < 2000 || target_read_end - target_read_start + ext5 + ext3 < 2000) return 2; // short overlap
 	//length = l;
 
