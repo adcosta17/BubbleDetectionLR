@@ -91,158 +91,308 @@ std::string MatchUtils::get_read_string(std::string& str, bool use_names_as_is){
 
 void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name, bool reads, bool use_names_as_is){
 	using namespace std;
-    io::filtering_istream in_filter;
-    in_filter.push(io::gzip_decompressor());
-    in_filter.push(io::file_source(file_name));
+    string suffix = ".paf.gz";
+    if(file_name.find(suffix) != string::npos){
+        io::filtering_istream in_filter;
+        in_filter.push(io::gzip_decompressor());
+        in_filter.push(io::file_source(file_name));
 
-	//ifstream inputFile_filter(file_name);
-	string line;
-	while (getline(in_filter, line, '\n'))
-	{
-		istringstream lin(line);
-    	string c1, c6, meta, cg;
-    	char c5;
-    	int c2, c3, c4, c7, c8, c9, c10, c11;
-    	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
-        c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
-        c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
-        //getline(lin, meta);
-        if(reads){
-        	read_ids.insert(c1);
-        	read_ids.insert(c6);
-    	}
-        if(to_drop.count(c1) > 0 || to_drop.count(c6) > 0 ){
-        	continue;
+    	string line;
+    	while (getline(in_filter, line, '\n'))
+    	{
+    		istringstream lin(line);
+        	string c1, c6, meta, cg;
+        	char c5;
+        	int c2, c3, c4, c7, c8, c9, c10, c11;
+        	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
+            c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
+            c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
+            //getline(lin, meta);
+            if(reads){
+            	read_ids.insert(c1);
+            	read_ids.insert(c6);
+        	}
+            if(to_drop.count(c1) > 0 || to_drop.count(c6) > 0 ){
+            	continue;
+            }
+            if(chimeric_reads.count(c1) != 0){
+                to_drop.insert(c1);
+            }
+            if(chimeric_reads.count(c6) != 0){
+                to_drop.insert(c6);
+                continue;
+            }
+            Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,"");
+            if(tmpLine.internal_edge()){
+            	continue;
+            }
+            int contained = tmpLine.check_match_contained();
+    	    if(contained == 1 && to_drop.count(tmpLine.target_read_id) == 0){
+    	        to_drop.insert(tmpLine.target_read_id);
+                //cout << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << "\t" << c5 << "\t" << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << endl; 
+    	    } else if (contained == -1 && to_drop.count(tmpLine.query_read_id) == 0) {
+    	        to_drop.insert(tmpLine.query_read_id);
+                //cout << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << "\t" << c5 << "\t" << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << endl;
+    	    }
         }
-        if(chimeric_reads.count(c1) != 0){
-            to_drop.insert(c1);
+    }
+    else {
+        ifstream in_filter(file_name);
+        string line;
+        while (getline(in_filter, line, '\n'))
+        {
+            istringstream lin(line);
+            string c1, c6, meta, cg;
+            char c5;
+            int c2, c3, c4, c7, c8, c9, c10, c11;
+            lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
+            c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
+            c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
+            //getline(lin, meta);
+            if(reads){
+                read_ids.insert(c1);
+                read_ids.insert(c6);
+            }
+            if(to_drop.count(c1) > 0 || to_drop.count(c6) > 0 ){
+                continue;
+            }
+            if(chimeric_reads.count(c1) != 0){
+                to_drop.insert(c1);
+            }
+            if(chimeric_reads.count(c6) != 0){
+                to_drop.insert(c6);
+                continue;
+            }
+            Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,"");
+            if(tmpLine.internal_edge()){
+                continue;
+            }
+            int contained = tmpLine.check_match_contained();
+            if(contained == 1 && to_drop.count(tmpLine.target_read_id) == 0){
+                to_drop.insert(tmpLine.target_read_id);
+                //cout << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << "\t" << c5 << "\t" << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << endl; 
+            } else if (contained == -1 && to_drop.count(tmpLine.query_read_id) == 0) {
+                to_drop.insert(tmpLine.query_read_id);
+                //cout << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << "\t" << c5 << "\t" << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << endl;
+            }
         }
-        if(chimeric_reads.count(c6) != 0){
-            to_drop.insert(c6);
-            continue;
-        }
-        Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,"");
-        if(tmpLine.internal_edge()){
-        	continue;
-        }
-        int contained = tmpLine.check_match_contained();
-	    if(contained == 1 && to_drop.count(tmpLine.target_read_id) == 0){
-	        to_drop.insert(tmpLine.target_read_id);
-            //cout << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << "\t" << c5 << "\t" << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << endl; 
-	    } else if (contained == -1 && to_drop.count(tmpLine.query_read_id) == 0) {
-	        to_drop.insert(tmpLine.query_read_id);
-            //cout << c1 << "\t" << c2 << "\t" << c3 << "\t" << c4 << "\t" << c5 << "\t" << c6 << "\t" << c7 << "\t" << c8 << "\t" << c9 << endl;
-	    }
     }
 }
 
 std::vector<int> get_all_matches_for_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw, bool use_names_as_is){
 	using namespace std;
 
-	io::filtering_istream in;
-    in.push(io::gzip_decompressor());
-    in.push(io::file_source(file_name));
+    string suffix = ".paf.gz";
     vector<int> sizes;
     string line;
-	while (getline(in, line, '\n'))
-	{
-        // Each line of input is split into columns
-        // Each line coresponds to a called overlap
-		istringstream lin(line);
-    	string c1, c6, meta, cg;
-    	char c5;
-    	int c2, c3, c4, c7, c8, c9, c10, c11;
-    	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
-        c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
-        c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
-        //getline(lin, meta);
-        //size_t idx = meta.find("cg:");
-        cg = "";
-        //if(idx != string::npos){
-        //    cg = meta.substr(idx+5);
-        //}
-        //cerr << cg << endl;
-        // Check for self alignments && contained reads
-        Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,cg);
-        if(raw){
-	        if(raw_matches.count(c1) == 0){
-	            vector<Match> tmp;
-	            raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
-	        }
-	        if(raw_matches.count(c6) == 0){
-	            vector<Match> tmp;
-	            raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
-	        }
-        	if(c1 < c6) {
-            	raw_matches[c1].push_back(tmpLine);
-        	} else {
-            	raw_matches[c6].push_back(tmpLine);
-        	}
-        }
-        if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
-            continue;
-        }
-        // Match is not long enough
-        if((c4 - c3) < 2000 || (c9 - c8) < 2000 || c10 < 100){
-        	//cerr << c4 - c3 << " " << c8 - c7  << endl;
-        	continue;
-        }
-        // Check that the alignments are proper, and at the ends of reads, if not edge reduction will fail    	
-        // Generate Unflitered Matches for the raw gfa file
-        if(!tmpLine.internal_edge() && tmpLine.check_match_contained() == 0){
-        	if(all_matches.count(c1) == 0){
-        		vector<Match> tmp;
-        		all_matches.insert(pair<string, vector<Match> >(c1,tmp));
-        	}
-        	if(all_matches.count(c6) == 0){
-        		vector<Match> tmp;
-        		all_matches.insert(pair<string, vector<Match> >(c6,tmp));
-        	}
-	        // Determine which list to store under based on lexographic comparison
-	        // Should never have equality here, check done above already
-            tmpLine.overlap_species = name;
-	        if(c1 < c6) {
-	        	all_matches[c1].push_back(tmpLine);
-	        	if(matches_indexed.count(c6) == 0){
-	        		vector<string> tmp;
-	        		matches_indexed.insert(pair<string, vector<string> >(c6, tmp));
-	        	}
-	        	matches_indexed[c6].push_back(c1);
-	        } else {
-	        	all_matches[c6].push_back(tmpLine);
-	        	if(matches_indexed.count(c1) == 0){
-	        		vector<string> tmp;
-	        		matches_indexed.insert(pair<string, vector<string> >(c1, tmp));
-	        	}
-	        	matches_indexed[c1].push_back(c6);
-	        }
-            /*
-	        if(edge_lists.count(c1) == 0){
-	        	vector<Match> tmp;
-	        	edge_lists.insert(pair<string, vector<Match> >(c1,tmp));
-	        }
-	        if(edge_lists.count(c6) == 0){
-	        	vector<Match> tmp;
-	        	edge_lists.insert(pair<string, vector<Match> >(c6,tmp));
-	        }
-            */
-	        //tmpLine.cigar = "";
-	        //edge_lists[c1].push_back(tmpLine);
-	        //Match tmpLine2(c6,c7,c8,c9,c5,c1,c2,c3,c4,c10,c11,0,0,"");
-	        //tmpLine2.check_match_contained();
-	        //edge_lists[c6].push_back(tmpLine2);
+    if(file_name.find(suffix) != string::npos){
 
-	        read_ids.insert(c1);
-	        read_ids.insert(c6);
-	        if(read_lengths.count(c1) == 0){
-	            read_lengths.insert(pair<string, int>(c1, c2));
-                sizes.push_back(c2);
-	        }
-	        if(read_lengths.count(c6) == 0){
-	            read_lengths.insert(pair<string, int>(c6, c7));
-                sizes.push_back(c7);
-	        }
-    	}
+    	io::filtering_istream in;
+        in.push(io::gzip_decompressor());
+        in.push(io::file_source(file_name));
+    	while (getline(in, line, '\n'))
+    	{
+            // Each line of input is split into columns
+            // Each line coresponds to a called overlap
+    		istringstream lin(line);
+        	string c1, c6, meta, cg;
+        	char c5;
+        	int c2, c3, c4, c7, c8, c9, c10, c11;
+        	lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
+            c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
+            c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
+            //getline(lin, meta);
+            //size_t idx = meta.find("cg:");
+            cg = "";
+            //if(idx != string::npos){
+            //    cg = meta.substr(idx+5);
+            //}
+            //cerr << cg << endl;
+            // Check for self alignments && contained reads
+            Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,cg);
+            if(raw){
+    	        if(raw_matches.count(c1) == 0){
+    	            vector<Match> tmp;
+    	            raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
+    	        }
+    	        if(raw_matches.count(c6) == 0){
+    	            vector<Match> tmp;
+    	            raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
+    	        }
+            	if(c1 < c6) {
+                	raw_matches[c1].push_back(tmpLine);
+            	} else {
+                	raw_matches[c6].push_back(tmpLine);
+            	}
+            }
+            if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
+                continue;
+            }
+            // Match is not long enough
+            if((c4 - c3) < 2000 || (c9 - c8) < 2000 || c10 < 100){
+            	//cerr << c4 - c3 << " " << c8 - c7  << endl;
+            	continue;
+            }
+            // Check that the alignments are proper, and at the ends of reads, if not edge reduction will fail    	
+            // Generate Unflitered Matches for the raw gfa file
+            if(!tmpLine.internal_edge() && tmpLine.check_match_contained() == 0){
+            	if(all_matches.count(c1) == 0){
+            		vector<Match> tmp;
+            		all_matches.insert(pair<string, vector<Match> >(c1,tmp));
+            	}
+            	if(all_matches.count(c6) == 0){
+            		vector<Match> tmp;
+            		all_matches.insert(pair<string, vector<Match> >(c6,tmp));
+            	}
+    	        // Determine which list to store under based on lexographic comparison
+    	        // Should never have equality here, check done above already
+                tmpLine.overlap_species = name;
+    	        if(c1 < c6) {
+    	        	all_matches[c1].push_back(tmpLine);
+    	        	if(matches_indexed.count(c6) == 0){
+    	        		vector<string> tmp;
+    	        		matches_indexed.insert(pair<string, vector<string> >(c6, tmp));
+    	        	}
+    	        	matches_indexed[c6].push_back(c1);
+    	        } else {
+    	        	all_matches[c6].push_back(tmpLine);
+    	        	if(matches_indexed.count(c1) == 0){
+    	        		vector<string> tmp;
+    	        		matches_indexed.insert(pair<string, vector<string> >(c1, tmp));
+    	        	}
+    	        	matches_indexed[c1].push_back(c6);
+    	        }
+                /*
+    	        if(edge_lists.count(c1) == 0){
+    	        	vector<Match> tmp;
+    	        	edge_lists.insert(pair<string, vector<Match> >(c1,tmp));
+    	        }
+    	        if(edge_lists.count(c6) == 0){
+    	        	vector<Match> tmp;
+    	        	edge_lists.insert(pair<string, vector<Match> >(c6,tmp));
+    	        }
+                */
+    	        //tmpLine.cigar = "";
+    	        //edge_lists[c1].push_back(tmpLine);
+    	        //Match tmpLine2(c6,c7,c8,c9,c5,c1,c2,c3,c4,c10,c11,0,0,"");
+    	        //tmpLine2.check_match_contained();
+    	        //edge_lists[c6].push_back(tmpLine2);
+
+    	        read_ids.insert(c1);
+    	        read_ids.insert(c6);
+    	        if(read_lengths.count(c1) == 0){
+    	            read_lengths.insert(pair<string, int>(c1, c2));
+                    sizes.push_back(c2);
+    	        }
+    	        if(read_lengths.count(c6) == 0){
+    	            read_lengths.insert(pair<string, int>(c6, c7));
+                    sizes.push_back(c7);
+    	        }
+        	}
+        }
+    }
+    else {
+        ifstream in(file_name);
+        while (getline(in, line, '\n'))
+        {
+            // Each line of input is split into columns
+            // Each line coresponds to a called overlap
+            istringstream lin(line);
+            string c1, c6, meta, cg;
+            char c5;
+            int c2, c3, c4, c7, c8, c9, c10, c11;
+            lin >> c1 >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11;
+            c1 = MatchUtils::get_hex_string(c1, use_names_as_is);
+            c6 = MatchUtils::get_hex_string(c6, use_names_as_is);
+            //getline(lin, meta);
+            //size_t idx = meta.find("cg:");
+            cg = "";
+            //if(idx != string::npos){
+            //    cg = meta.substr(idx+5);
+            //}
+            //cerr << cg << endl;
+            // Check for self alignments && contained reads
+            Match tmpLine(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,0,0,cg);
+            if(raw){
+                if(raw_matches.count(c1) == 0){
+                    vector<Match> tmp;
+                    raw_matches.insert(pair<string, vector<Match> >(c1,tmp));
+                }
+                if(raw_matches.count(c6) == 0){
+                    vector<Match> tmp;
+                    raw_matches.insert(pair<string, vector<Match> >(c6,tmp));
+                }
+                if(c1 < c6) {
+                    raw_matches[c1].push_back(tmpLine);
+                } else {
+                    raw_matches[c6].push_back(tmpLine);
+                }
+            }
+            if(c1 == c6 || to_drop.count(c1) > 0 || to_drop.count(c6) > 0) {
+                continue;
+            }
+            // Match is not long enough
+            if((c4 - c3) < 2000 || (c9 - c8) < 2000 || c10 < 100){
+                //cerr << c4 - c3 << " " << c8 - c7  << endl;
+                continue;
+            }
+            // Check that the alignments are proper, and at the ends of reads, if not edge reduction will fail      
+            // Generate Unflitered Matches for the raw gfa file
+            if(!tmpLine.internal_edge() && tmpLine.check_match_contained() == 0){
+                if(all_matches.count(c1) == 0){
+                    vector<Match> tmp;
+                    all_matches.insert(pair<string, vector<Match> >(c1,tmp));
+                }
+                if(all_matches.count(c6) == 0){
+                    vector<Match> tmp;
+                    all_matches.insert(pair<string, vector<Match> >(c6,tmp));
+                }
+                // Determine which list to store under based on lexographic comparison
+                // Should never have equality here, check done above already
+                tmpLine.overlap_species = name;
+                if(c1 < c6) {
+                    all_matches[c1].push_back(tmpLine);
+                    if(matches_indexed.count(c6) == 0){
+                        vector<string> tmp;
+                        matches_indexed.insert(pair<string, vector<string> >(c6, tmp));
+                    }
+                    matches_indexed[c6].push_back(c1);
+                } else {
+                    all_matches[c6].push_back(tmpLine);
+                    if(matches_indexed.count(c1) == 0){
+                        vector<string> tmp;
+                        matches_indexed.insert(pair<string, vector<string> >(c1, tmp));
+                    }
+                    matches_indexed[c1].push_back(c6);
+                }
+                /*
+                if(edge_lists.count(c1) == 0){
+                    vector<Match> tmp;
+                    edge_lists.insert(pair<string, vector<Match> >(c1,tmp));
+                }
+                if(edge_lists.count(c6) == 0){
+                    vector<Match> tmp;
+                    edge_lists.insert(pair<string, vector<Match> >(c6,tmp));
+                }
+                */
+                //tmpLine.cigar = "";
+                //edge_lists[c1].push_back(tmpLine);
+                //Match tmpLine2(c6,c7,c8,c9,c5,c1,c2,c3,c4,c10,c11,0,0,"");
+                //tmpLine2.check_match_contained();
+                //edge_lists[c6].push_back(tmpLine2);
+
+                read_ids.insert(c1);
+                read_ids.insert(c6);
+                if(read_lengths.count(c1) == 0){
+                    read_lengths.insert(pair<string, int>(c1, c2));
+                    sizes.push_back(c2);
+                }
+                if(read_lengths.count(c6) == 0){
+                    read_lengths.insert(pair<string, int>(c6, c7));
+                    sizes.push_back(c7);
+                }
+            }
+        }
     }
     return sizes;
 }
@@ -495,9 +645,9 @@ int MatchUtils::read_and_assemble_paf_dir(std::map<std::string, std::vector<Matc
 int MatchUtils::read_paf_file(std::map<std::string, std::vector<Match> >& all_matches, std::map<std::string, std::vector<std::string>>& matches_indexed, std::map<std::string, std::vector<Match> >& raw_matches, std::set<std::string>& read_ids, std::map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::map<std::string, Read>& read_classification, bool gfa, bool use_names_as_is)
 {
 	using namespace std;
-    io::filtering_istream in_filter;
-    in_filter.push(io::gzip_decompressor());
-    in_filter.push(io::file_source(file_name));
+    //io::filtering_istream in_filter;
+    //in_filter.push(io::gzip_decompressor());
+    //in_filter.push(io::file_source(file_name));
 
 	//ifstream inputFile_filter(file_name);
 	string line;
