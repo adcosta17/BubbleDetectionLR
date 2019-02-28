@@ -4,6 +4,9 @@ Genome assembly and Bubble Detection for Nanopore long reads
 
 BubbleDetect is designed to take in a set of all v all overlaps, lay them out in an assembly graph and compute the bubbles that occur within them. Each bubble is scored based on a number of characterisitcs including taxinomic classification and coverage if provided by the user. The assembly generated is outputted along with the bubble list to a user specified location.  
 
+## Dependancies
+- ZLib
+- Boost
 
 ## Setup, Usage & Examples
 ```sh
