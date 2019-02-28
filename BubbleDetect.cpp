@@ -44,7 +44,7 @@ int main(int argc, char** argv)
     bool do_assembly_stats = true;
     int opt, iterations = 10, fuzz = 1000, threshold = 5, genome_size = 0;
     string pafFile, outputFileName, taxonomy_file, colour_file, chimeric_read_file, coverage_file, mpa_file;
-    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:l:b:z:x:a:")) != EOF)
+    while ((opt = getopt(argc,argv,"p:o:i:f:t:r:s:c:h:m:g:lbzxa")) != EOF)
     {
         switch(opt)
         {
