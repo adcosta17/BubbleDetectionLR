@@ -3,6 +3,8 @@
 #include <iostream>
 #include <fstream>
 
+Match::Match(){}
+
 Match::Match(std::string qrid, int qrl, int qrs, int qre,
 	char str, std::string trid, int trl, int trs, int tre, int rm,
 	int ab, int pl, int sl, std::string cg, int threshold, bool rev)
@@ -115,7 +117,6 @@ int Match::check_match_contained()
 	if (query_read_end - query_read_start + ext5 + ext3 < 2000 || target_read_end - target_read_start + ext5 + ext3 < 2000) return 2; // short overlap
 	//length = l;
 
-	// Filter out reads that have a very high overlap percentage. Minimap2 maybe missing some portions at start or end. Anything with 90% overlap as a fraction fo the read is going to be considered contained
 	// To be implemented as needed
 	return 0;
 }

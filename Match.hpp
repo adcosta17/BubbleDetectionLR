@@ -1,6 +1,6 @@
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <set>
 
 class Match 
@@ -45,6 +45,8 @@ public:
 		std::string cg,
 		int threshold = 100,
 		bool rev = false);
+
+	Match();
 
 	int getQueryAlignmentLen();
 	int getTargetAlignmentLen();

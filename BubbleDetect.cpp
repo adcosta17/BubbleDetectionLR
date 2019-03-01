@@ -79,36 +79,25 @@ int main(int argc, char** argv)
         exit = true;
     }
     if(exit){
-        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)\n (optional) -x skip bubble detection if needed\n (optional) -z use_names_as_is, don't compress read ids. Useful if read ids aren't in normal Nanopre ID form \n";
+        cerr << "Usage: BubbleDetect\n -p Paf_Input_File.paf or directory containing paf files\n -o Output Path and Prefix\n (optional) -i Iterations# [10]\n (optional) -f fuzz[1000]\n (optional) -t threshold[5]\n (optional) -r read classification file\n (optional) -s species to colour map\n (optional) -h chimeric read map\n (optional) -c read coverage map\n (optional) -m kraken mpa classification file\n (optional) -g total estimated genome size (used for NG50 rather than N50 Calculation)\n (optional) -x skip bubble detection if needed\n (optional) -z use_names_as_is, don't compress read ids. Useful if read ids aren't in normal Nanopre ID form \n (optional) -a skip_assembly_stats skips computation of N50/NG50 \n";
         return 0;
     }
 
-    /*
-    string tmp = "5e6696ec-5b69-4cb7-b0b0-33cccfc6714b";
-    cout << tmp << endl;
-    tmp = MatchUtils::get_hex_string(tmp);
-    cout << tmp << endl;
-    cout << "done1" << endl;
-    tmp = MatchUtils::get_read_string(tmp);
-    cout << tmp << endl;
-    cout << "done" << endl;
-    */
-
     // Read in and Parse input file
-	map<string, vector<Match> > all_matches;
-    map<string, vector<Match> > raw_matches;
+	unordered_map<string, unordered_map<string, Match> > all_matches;
+    unordered_map<string, unordered_map<string, Match> > raw_matches;
     set<string> read_ids;
-    map<string, int> read_lengths;
+    unordered_map<string, int> read_lengths;
     set<string> chimeric_reads;
-    map<string, Read> read_classification;
-    map<string, float> read_coverage;
-    map<string, string> read_levels;
-    map<string, string> read_full_taxonomy;
-    map<string, string> read_lowest_taxonomy;
-    map<string, float> classification_avg_coverage;
-    map<string, float> per_species_coverage;
-    map<string, set<string>> read_groups;
-    map<string, vector<string>> matches_indexed; 
+    unordered_map<string, Read> read_classification;
+    unordered_map<string, float> read_coverage;
+    unordered_map<string, string> read_levels;
+    unordered_map<string, string> read_full_taxonomy;
+    unordered_map<string, string> read_lowest_taxonomy;
+    unordered_map<string, float> classification_avg_coverage;
+    unordered_map<string, float> per_species_coverage;
+    unordered_map<string, set<string>> read_groups;
+    unordered_map<string, vector<string>> matches_indexed; 
 
     if(chimeric){
         cerr << "Reading in Chimeric Read List" << endl;
@@ -135,9 +124,9 @@ int main(int argc, char** argv)
                 // need the mpa to bin reads based on their classification
                 cerr << "Reading in MPA File" << endl;
                 ifstream inputFile_mpa(mpa_file);
-                map<string, Read> mpa_read_classification;
+                unordered_map<string, Read> mpa_read_classification;
                 set<string> classification_set;
-                map<string, int> classification_count;
+                unordered_map<string, int> classification_count;
                 classification_set.insert("");
                 set<string> tmp_set;
                 read_groups.insert(make_pair("", tmp_set));
@@ -184,8 +173,8 @@ int main(int argc, char** argv)
                 }
                 cerr << "Reading in Read Coverage List" << endl;
                 ifstream inputFileCoverage(coverage_file);
-                map<string, int> num_bases;
-                map<string, float> tmp_read_coverage;
+                unordered_map<string, int> num_bases;
+                unordered_map<string, float> tmp_read_coverage;
                 while (getline(inputFileCoverage, line, '\n'))
                 {
                     istringstream lin(line);
@@ -199,7 +188,7 @@ int main(int argc, char** argv)
                     }
                     read_coverage.insert(make_pair(id, cov));
                     tmp_read_coverage.insert(make_pair(id, cov*len));
-                    for(map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
+                    for(unordered_map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
                     {
                         if(it->second.count(id) > 0){
                             if(num_bases.count(it->first) == 0){
@@ -209,10 +198,10 @@ int main(int argc, char** argv)
                         }
                     }
                 }
-                for(map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
+                for(unordered_map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
                 {
                     per_species_coverage.insert(make_pair(it->first, 0.0));
-                    for (map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
+                    for (unordered_map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
                     {
                         per_species_coverage[it->first] += it2->second/num_bases[it->first];
                     }
@@ -247,7 +236,7 @@ int main(int argc, char** argv)
 
             // Take the list of paf_files and then for each of them read in the file
             for (set<string>::iterator it = cov_files.begin(); it != cov_files.end(); ++it) {
-                map<string, float> tmp_read_coverage;
+                unordered_map<string, float> tmp_read_coverage;
                 int num_bases = 0;
                 string cov_fh = *it;
                 ifstream inputFileCoverage(cov_fh);
@@ -270,7 +259,7 @@ int main(int argc, char** argv)
                     //cout << read_coverage[id] << endl;
                 }
                 per_species_coverage.insert(make_pair(name, 0.0));
-                for (map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
+                for (unordered_map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
                 {
                     per_species_coverage[name] += it2->second/num_bases;
                 }
@@ -296,8 +285,8 @@ int main(int argc, char** argv)
     }
 
     int mean_read_length = 0;
-    map<string, vector<string> > read_indegree; // Number of times read is target
-    map<string, vector<string> > read_outdegree;
+    unordered_map<string, vector<string> > read_indegree; // Number of times read is target
+    unordered_map<string, vector<string> > read_outdegree;
     vector<string> n50_values;
     
     if(!is_file(pafFile.c_str()) && !is_dir(pafFile.c_str())){
@@ -323,12 +312,12 @@ int main(int argc, char** argv)
         for (int i = 0; i < iterations; ++i)
         {
             set<string> de_ids;
-            map<string, vector<string> > de_paths;
+            unordered_map<string, vector<string> > de_paths;
             read_indegree.clear();
             read_outdegree.clear();
             MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
             // Prune Dead End Reads
-            MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
+            MatchUtils::compute_dead_ends(read_ids,read_indegree, read_outdegree, de_ids, de_paths);
             rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
             MatchUtils::clean_matches(all_matches);
         }
@@ -351,19 +340,19 @@ int main(int argc, char** argv)
         MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
     }
     
-    map<string, string> read_names;
+    unordered_map<string, string> read_names;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             string tmp_string(*it);
             read_names.insert(make_pair(*it, MatchUtils::get_read_string(tmp_string, use_names_as_is)));
     }
-    map<string, string> colours;
+    unordered_map<string, string> colours;
     for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
 
     if(tax){
         cerr << "Taxonomy File Detected" << endl;
-        map<string, string> species_map;
+        unordered_map<string, string> species_unordered_map;
         string line;
         if(col){
             ifstream inputFile_colour(colour_file);
@@ -377,7 +366,7 @@ int main(int argc, char** argv)
                     result.push_back(level);
                 }
                 if(result.size() > 1){
-                    species_map[result[0]] = result[1];
+                    species_unordered_map[result[0]] = result[1];
                 }
             }
             cerr << "Assigning Levels and Colours to Reads" << endl;
@@ -402,7 +391,7 @@ int main(int argc, char** argv)
             read_full_taxonomy.insert(make_pair(id, classification));
             read_lowest_taxonomy.insert(make_pair(id, result[result.size() - 1]));
             if(col){
-                for(map<string, string>::iterator it=species_map.begin(); it!= species_map.end(); ++it) {
+                for(unordered_map<string, string>::iterator it=species_unordered_map.begin(); it!= species_unordered_map.end(); ++it) {
                     if (result[result.size() - 1].find(it->first) != std::string::npos) {
                         colours[id] = it->second;
                         break;
@@ -412,7 +401,7 @@ int main(int argc, char** argv)
         }
     }
 
-    if(skip_bubble){
+    if(!skip_bubble){
 	    cerr << "Compute Possible Bubbles" << endl;
 	    //Find Paths to each node from a given start
 	    map<pair<string,string>, set<string> > bubble_sets;
@@ -681,12 +670,12 @@ int main(int argc, char** argv)
 	    for (int i = 0; i < iterations; ++i)
 	    {
 	        set<string> de_ids;
-	        map<string, vector<string> > de_paths;
+	        unordered_map<string, vector<string> > de_paths;
 	        read_indegree.clear();
 	        read_outdegree.clear();
 	        MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
 	        // Prune Dead End Reads
-	        MatchUtils::compute_dead_ends(all_matches, read_ids,read_indegree, read_outdegree, de_ids, de_paths);
+	        MatchUtils::compute_dead_ends(read_ids,read_indegree, read_outdegree, de_ids, de_paths);
 	        rm_edge += MatchUtils::prune_dead_paths(all_matches, read_ids, read_indegree, read_outdegree, de_paths, mean_read_length, threshold);
 	        MatchUtils::clean_matches(all_matches);
 	    }
