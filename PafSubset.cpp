@@ -7,7 +7,7 @@
 
 using namespace std;
 
-void helper(set<string>& ids, int levels, string source_read, unordered_map<string, unordered_map<string,Match> >& raw_matches)
+void helper(unordered_set<string>& ids, int levels, string source_read, unordered_map<string, unordered_map<string,Match> >& raw_matches)
 {
     if(levels >= 0){
         ids.insert(source_read);
@@ -43,8 +43,8 @@ int main(int argc, char** argv)
     // Read in and Parse input file
 	unordered_map<string, unordered_map<string,Match> > all_matches;
     unordered_map<string, unordered_map<string,Match> > raw_matches;
-    set<string> read_ids;
-    set<string> chimeric_reads;
+    unordered_set<string> read_ids;
+    unordered_set<string> chimeric_reads;
     unordered_map<string, Read> read_classification;
     unordered_map<string, vector<string>> matches_indexed;
     unordered_map<string, int> read_lengths;
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     cout << raw_matches.size() << endl;
     string source_read = argv[2];
     int levels = atoi(argv[3]);
-    set<string> ids;
+    unordered_set<string> ids;
     helper(ids, levels, source_read, raw_matches);
     for (unordered_map<string, unordered_map<string,Match> >::iterator it=raw_matches.begin(); it!=raw_matches.end(); ++it)
     {

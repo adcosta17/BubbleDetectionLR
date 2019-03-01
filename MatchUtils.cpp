@@ -89,7 +89,7 @@ std::string MatchUtils::get_read_string(std::string& str, bool use_names_as_is){
     return to_ret;
 }
 
-void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<std::string>& chimeric_reads, std::set<std::string>& read_ids, std::string file_name, bool reads, bool use_names_as_is){
+void get_contained_and_chimeric_reads(std::unordered_set<std::string>& to_drop, std::unordered_set<std::string>& chimeric_reads, std::unordered_set<std::string>& read_ids, std::string file_name, bool reads, bool use_names_as_is){
 	using namespace std;
     string suffix = ".paf.gz";
     if(file_name.find(suffix) != string::npos){
@@ -179,7 +179,7 @@ void get_contained_and_chimeric_reads(std::set<std::string>& to_drop, std::set<s
     }
 }
 
-std::vector<int> get_all_matches_for_file(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::unordered_map<std::string, std::unordered_map<std::string,Match> >& raw_matches, std::set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::unordered_map<std::string, Read>& read_classification, std::set<std::string>& to_drop, std::string name, bool raw, bool use_names_as_is){
+std::vector<int> get_all_matches_for_file(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::unordered_map<std::string, std::unordered_map<std::string,Match> >& raw_matches, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::unordered_map<std::string, Read>& read_classification, std::unordered_set<std::string>& to_drop, std::string name, bool raw, bool use_names_as_is){
 	using namespace std;
 
     string suffix = ".paf.gz";
@@ -381,9 +381,9 @@ std::vector<int> get_all_matches_for_file(std::unordered_map<std::string, std::u
     return sizes;
 }
 
-int MatchUtils::read_and_assemble_paf_dir_binned(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::unordered_map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold, bool use_names_as_is){
+int MatchUtils::read_and_assemble_paf_dir_binned(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::vector<std::string>& n50_values, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::unordered_set<std::string>& chimeric_reads, std::unordered_map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold, bool use_names_as_is){
     using namespace std;
-    set<string> paf_files;
+    unordered_set<string> paf_files;
     DIR *dir;
     struct dirent *ent;
     string suffix = ".ava.paf.gz";
@@ -407,24 +407,24 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::unordered_map<std::string,
 
     vector<int> average_read_lens;
     vector<int> total_reads;
-    set<string> to_drop;
+    unordered_set<string> to_drop;
     // Take the list of paf_files and then for each of them read in the file
     cerr << "Caculating Contained Reads" << endl;
-    for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+    for (unordered_set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
 
         // get species name
         string tmp = *it;
-        set<string> tmp_read_ids;
+        unordered_set<string> tmp_read_ids;
         get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false, use_names_as_is);
         
     }
 
-    for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+    for (unordered_set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         string tmp = *it;
         size_t found = tmp.find_last_of("/");
         string name(tmp.substr(found+1).substr(0,tmp.substr(found+1).size()-11));
         cerr << "Assembling " << name << endl;
-        set<string> tmp_read_ids;
+        unordered_set<string> tmp_read_ids;
         unordered_map<string, unordered_map<string,Match>> tmp_all_matches;
         unordered_map<string, unordered_map<string,Match>> tmp_raw_matches;
         unordered_map<string, vector<string>> matches_indexed;
@@ -449,7 +449,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::unordered_map<std::string,
         int rm_edge = 0;
         for (int j = 0; j < iterations; ++j)
         {
-            set<string> de_ids;
+            unordered_set<string> de_ids;
             unordered_map<string, vector<string> > de_paths;
             read_indegree.clear();
             read_outdegree.clear();
@@ -469,7 +469,7 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::unordered_map<std::string,
             n50_values.push_back(name + "\n" + n50_val);
         }
 
-        for (set<string>::iterator it2=tmp_read_ids.begin(); it2!=tmp_read_ids.end(); ++it2){
+        for (unordered_set<string>::iterator it2=tmp_read_ids.begin(); it2!=tmp_read_ids.end(); ++it2){
             if(read_outdegree[*it2].size() > 0 || read_indegree[*it2].size() > 0){
                 // Read is in connected componenet, add to set to drop
                 read_ids.insert(*it2);
@@ -507,9 +507,9 @@ int MatchUtils::read_and_assemble_paf_dir_binned(std::unordered_map<std::string,
 
 
 
-int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::vector<std::string>& n50_values, std::set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::unordered_map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold, bool use_names_as_is){
+int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::vector<std::string>& n50_values, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::unordered_set<std::string>& chimeric_reads, std::unordered_map<std::string, Read>& read_classification, int fuzz, int iterations, int threshold, bool use_names_as_is){
 	using namespace std;
-	set<string> paf_files;
+	unordered_set<string> paf_files;
 	DIR *dir;
 	struct dirent *ent;
 	string suffix = ".ava.paf.gz";
@@ -534,10 +534,10 @@ int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::u
 	// Take the list of paf_files and then for each of them read in the file
     vector<int> average_read_lens;
     vector<int> total_reads;
-    set<string> to_drop;
+    unordered_set<string> to_drop;
     cerr << "Caculating Contained Reads" << endl;
-	for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
-        set<string> tmp_read_ids;
+	for (unordered_set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+        unordered_set<string> tmp_read_ids;
         string tmp = *it;
 		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false, use_names_as_is);
 
@@ -546,13 +546,13 @@ int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::u
     unordered_map<string, vector<string> > read_indegree;
     unordered_map<string, vector<string> > read_outdegree;
     int mean_read_length = 0;
-    for (set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
+    for (unordered_set<string>::iterator it = paf_files.begin(); it != paf_files.end(); ++it) {
         // get species name
         string tmp = *it;
         size_t found = tmp.find_last_of("/");
         string name(tmp.substr(found+1).substr(0,tmp.substr(found+1).size()-11));
         cerr << "Assembling " << name << endl;
-        set<string> tmp_read_ids;
+        unordered_set<string> tmp_read_ids;
         unordered_map<string, unordered_map<string,Match>> tmp_raw_matches;
         cerr << "\tReading in overlaps" << endl;
 		vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, tmp_raw_matches, read_ids, read_lengths, tmp, read_classification, to_drop, name, false, use_names_as_is);
@@ -584,7 +584,7 @@ int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::u
     int rm_edge = 0;
     for (int j = 0; j < iterations; ++j)
     {
-        set<string> de_ids;
+        unordered_set<string> de_ids;
         unordered_map<string, vector<string> > de_paths;
         read_indegree.clear();
         read_outdegree.clear();
@@ -603,11 +603,11 @@ int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::u
     return mean_read_length;
 }
 
-int MatchUtils::read_paf_file(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::unordered_map<std::string, std::unordered_map<std::string,Match> >& raw_matches, std::set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::set<std::string>& chimeric_reads, std::unordered_map<std::string, Read>& read_classification, bool gfa, bool use_names_as_is)
+int MatchUtils::read_paf_file(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::unordered_map<std::string, std::unordered_map<std::string,Match> >& raw_matches, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, int>& read_lengths, std::string file_name, std::unordered_set<std::string>& chimeric_reads, std::unordered_map<std::string, Read>& read_classification, bool gfa, bool use_names_as_is)
 {
 	using namespace std;
 	string line;
-    set<string> to_drop;
+    unordered_set<string> to_drop;
     cerr << "Checking for Contained Reads" << endl;
     get_contained_and_chimeric_reads(to_drop, chimeric_reads, read_ids, file_name, true, use_names_as_is);
 	cerr << "Found: " << to_drop.size() << " Contained Reads and "<< read_ids.size() << " total reads" << endl;
@@ -731,14 +731,14 @@ float MatchUtils::validBubbleCov(std::vector<std::vector<std::string> >& arms, s
     return ratio;
 }
 
-void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::string>, std::set<std::string> >& bubble_sets, std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree){
+void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::string>, std::unordered_set<std::string> >& bubble_sets, std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree){
 	using namespace std;
 	set<pair<string, string> > seen_bubbles;
-	for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+	for (map<pair<string,string>, unordered_set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
     {    
        // First check if Bubble is fully contained by a larger bubble
        // If so mark it as seen and remove the edges of it appropraitely based on the in/out degree and start and end postions
-        for (map<pair<string,string>, set<string> >::iterator it2=bubble_sets.begin(); it2!=bubble_sets.end(); ++it2)
+        for (map<pair<string,string>, unordered_set<string> >::iterator it2=bubble_sets.begin(); it2!=bubble_sets.end(); ++it2)
         { 
             if(it->first == it2->first || std::make_pair((it->first).second, (it->first).first) == it2->first){
                 //same bubble
@@ -752,12 +752,12 @@ void MatchUtils::remove_internal_bubbles(std::map<std::pair<std::string,std::str
             }
             // Now check to see which set is larger
             if(it->second.size() < it2->second.size()){
-                set<string> intersect;
+                unordered_set<string> intersect;
                 set_intersection(it->second.begin(),it->second.end(),it2->second.begin(),it2->second.end(),inserter(intersect,intersect.begin()));
                 if(intersect.size() == it->second.size()){
                     // All nodes are contained in this larger bubble
                     // Should now evaluate each node and its edges to see if they should be kept or removed 
-                    for(set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
+                    for(unordered_set<string>::iterator it3=it->second.begin(); it3 != it->second.end(); it3++){
                         // First check to see if read is at the start or end of the bigger bubble, if so then don't do anything to it
                         if(*it3 == (it2->first).first || *it3 == (it2->first).second){
                             continue;
@@ -842,10 +842,10 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
     using namespace std;
 
     bool valid = false;
-    vector<set<string> > arm_classifcation;
+    vector<unordered_set<string> > arm_classifcation;
     for (std::size_t i = 0; i < arms.size(); ++i)
     {
-        set<string> tmp;
+        unordered_set<string> tmp;
         for (std::size_t j = 0; j < arms[i].size(); ++j)
         {
             tmp.insert(read_lowest_taxonomy[arms[i][j]]);
@@ -859,8 +859,8 @@ bool MatchUtils::validBubbleTax(std::vector<std::vector<std::string> >& arms, st
             if(i == j){
                 continue;
             }
-            set<string> res1;
-            set<string> res2;
+            unordered_set<string> res1;
+            unordered_set<string> res2;
             set_difference( arm_classifcation[i].begin(), arm_classifcation[i].end(), arm_classifcation[j].begin(), arm_classifcation[j].end(), inserter(res1, res1.begin()));
             set_difference( arm_classifcation[j].begin(), arm_classifcation[j].end(), arm_classifcation[i].begin(), arm_classifcation[i].end(), inserter(res2, res2.begin()));
             if(res1.size() > 0 && res2.size() > 0){
@@ -957,7 +957,7 @@ std::vector<float> MatchUtils::validBubbleTaxCov(std::vector<std::vector<std::st
     return ratio_cov;
 }
 
-std::string MatchUtils::compute_n50(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int threshold){
+std::string MatchUtils::compute_n50(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::unordered_set<std::string>& read_ids, int threshold){
     // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
     // Don't want to fully visualize as we need to see where each read comes from
     // Last step of Layout phase in OLC
@@ -968,7 +968,7 @@ std::string MatchUtils::compute_n50(std::unordered_map<std::string, std::unorder
 
     unordered_map<int, vector<Match> > contigs_sets;
     int contig_num = 0;
-    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    for (unordered_set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
         // Look for nodes that have at least 2 valid neighbours, or are dead ends
         // For each one we need to iterate over each neighbour and find path to next branch node
@@ -1052,12 +1052,12 @@ bool overlap_orientation(std::vector<std::string>& rin, std::vector<std::string>
 }
 
 
-void MatchUtils::collapse_contigs(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, std::unordered_map<std::string, std::string>& colours, std::unordered_map<std::string, float>& read_coverage, std::string outputFileName, int threshold){
+void MatchUtils::collapse_contigs(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, std::string>& colours, std::unordered_map<std::string, float>& read_coverage, std::string outputFileName, int threshold){
     using namespace std;
 
     unordered_map<int, vector<Match> > contigs_sets;
     int contig_num = 0;
-    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    for (unordered_set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
         // Look for nodes that have at least 2 valid neighbours, or are dead ends
         // For each one we need to iterate over each neighbour and find path to next branch node
@@ -1143,7 +1143,7 @@ void MatchUtils::collapse_contigs(std::unordered_map<std::string, std::unordered
     for (unordered_map<int, int>::iterator it = contig_lengths.begin(); it != contig_lengths.end(); ++it)
     {
         if(colours.size() > 0){
-            set<string> cols;
+            unordered_set<string> cols;
             for(std::size_t i=0; i<contigs_sets[it->first].size(); i++){
                 if(colours[contigs_sets[it->first][i].query_read_id] != "#bebebe"){
                     cols.insert(colours[contigs_sets[it->first][i].query_read_id]);
@@ -1375,7 +1375,7 @@ void MatchUtils::collapse_contigs(std::unordered_map<std::string, std::unordered
     gfaOutput.close();
 }
 
-std::string MatchUtils::compute_ng50(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::set<std::string>& read_ids, int genome_size, int threshold){
+std::string MatchUtils::compute_ng50(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::unordered_set<std::string>& read_ids, int genome_size, int threshold){
     // Need to evaluate the assembly stats (N50, Overall length, and total number of contigs.)
     // Don't want to fully visualize as we need to see where each read comes from
     // Last step of Layout phase in OLC
@@ -1386,7 +1386,7 @@ std::string MatchUtils::compute_ng50(std::unordered_map<std::string, std::unorde
 
     unordered_map<int, vector<Match> > contigs_sets;
     int contig_num = 0;
-    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    for (unordered_set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
         // Look for nodes that have at least 2 valid neighbours, or are dead ends
         // For each one we need to iterate over each neighbour and find path to next branch node
@@ -1449,7 +1449,7 @@ std::string MatchUtils::compute_ng50(std::unordered_map<std::string, std::unorde
 }
 
 
-void MatchUtils::subset_matches(std::unordered_map<std::string, std::vector<Match> >& all_matches, std::unordered_map<std::string, std::vector<Match> >& edge_lists, std::unordered_map<std::string, std::vector<Match> >& species_matches, std::unordered_map<std::string, std::vector<Match> >&  species_edge_lists, std::set<std::string> ids_to_use){
+void MatchUtils::subset_matches(std::unordered_map<std::string, std::vector<Match> >& all_matches, std::unordered_map<std::string, std::vector<Match> >& edge_lists, std::unordered_map<std::string, std::vector<Match> >& species_matches, std::unordered_map<std::string, std::vector<Match> >&  species_edge_lists, std::unordered_set<std::string> ids_to_use){
     for (std::unordered_map<std::string, std::vector<Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it)
     {
         for (std::size_t i = 0; i < it->second.size(); ++i)
@@ -1526,11 +1526,11 @@ void MatchUtils::remove_edge(std::unordered_map<std::string, std::unordered_map<
 }
 
 
-void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::map<std::pair<std::string,std::string>, std::set<std::string> >& bubble_sets, std::vector<std::string>& start_ids){
+void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::map<std::pair<std::string,std::string>, std::unordered_set<std::string> >& bubble_sets, std::vector<std::string>& start_ids){
 
-    std::set<std::string> visited;
+    std::unordered_set<std::string> visited;
     std::list<std::pair<std::string,std::string> > q;
-    std::map<std::pair<std::string,std::string>, std::set<std::string>> bubbles;
+    std::map<std::pair<std::string,std::string>, std::unordered_set<std::string>> bubbles;
     std::pair<std::string,std::string> end = std::make_pair("","");
     visited.insert(start);
     bool print = false;
@@ -1593,7 +1593,7 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
     // Once we have a node that we have already seen, backtrack and compute the set of visited nodes via a BFS from node we've already seen to the start node
     // Know that 2 paths exist, as proven in the first half so we should be able to find them.
     // Can take the two visited sets and do a intersection, giving us the set of nodes that is on the path between the two exactly
-    for(std::map<std::pair<std::string,std::string>, std::set<std::string>>::iterator it = bubbles.begin(); it != bubbles.end(); it++){
+    for(std::map<std::pair<std::string,std::string>, std::unordered_set<std::string>>::iterator it = bubbles.begin(); it != bubbles.end(); it++){
         visited = it->second;
         end = it->first;
         if(end.first != ""){
@@ -1601,7 +1601,7 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
                 std::cout << "Possible Bubble between: " << start << " and " << end.first << std::endl;
             }
             q.clear();
-            std::set<std::string> visited_back;
+            std::unordered_set<std::string> visited_back;
             visited_back.insert(end.first);
             // Need to check on the direction of our end node, see what the predacesor was and if it is in indegreee or outdegree
             if(std::find(read_indegree[end.first].begin(), read_indegree[end.first].end(), end.second) != read_indegree[end.first].end()){
@@ -1642,9 +1642,9 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
                                 if(print){
                                     std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
                                 }
-                                std::set<std::string> combined;
+                                std::unordered_set<std::string> combined;
                                 std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
-                                bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
+                                bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::unordered_set<std::string>>(make_pair(bubble_end, end.first), combined));
                                 q.clear();
                                 break;
                             }
@@ -1663,9 +1663,9 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
                                 if(print){
                                     std::cout << "Adding Bubble between: " << bubble_end << " and " << end.first << std::endl;
                                 }
-                                std::set<std::string> combined;
+                                std::unordered_set<std::string> combined;
                                 std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
-                                bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::set<std::string>>(make_pair(bubble_end, end.first), combined));
+                                bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::unordered_set<std::string>>(make_pair(bubble_end, end.first), combined));
                                 q.clear();
                                 break;
                             }
@@ -1677,7 +1677,7 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
     }
 }
 
-int recurse_bubble_arm(std::string id, std::string end, std::set<std::string> reads, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string>>& tmp_arms, int path_num, std::string prev){
+int recurse_bubble_arm(std::string id, std::string end, std::unordered_set<std::string> reads, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string>>& tmp_arms, int path_num, std::string prev){
     // Check the path that we are on to make sure it doesn't exceed the read set size
     bool print = false;
     //if(end == "2484"){
@@ -1783,7 +1783,7 @@ int recurse_bubble_arm(std::string id, std::string end, std::set<std::string> re
 
 }
 
-void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<std::string> reads, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string> >& arms){
+void MatchUtils::get_bubble_arms(std::string start, std::string end, std::unordered_set<std::string> reads, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::vector<std::vector<std::string> >& arms){
     // Know that if we get here there is a path between start and end that is seperate from one another.
     // Check indegree and then outdgree. If we have an edge from start to a read in our read set, then recurse over it, until we get to end
     bool print = false;
@@ -1976,10 +1976,10 @@ void MatchUtils::get_bubble_arms(std::string start, std::string end, std::set<st
     }
 }
 
-bool MatchUtils::check_bubble(std::string start, std::string end, std::set<std::string> reads, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree)
+bool MatchUtils::check_bubble(std::string start, std::string end, std::unordered_set<std::string> reads, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree)
 {
     // other than start and end reads any reads in set should only have in/out edges to other reads in set
-    for (std::set<std::string>::iterator it=reads.begin(); it!=reads.end(); ++it)
+    for (std::unordered_set<std::string>::iterator it=reads.begin(); it!=reads.end(); ++it)
     {
         if(start == *it || end == *it){
             // These are the exception nodes, they should be connected to other things in our graph
@@ -2006,7 +2006,7 @@ bool MatchUtils::check_bubble(std::string start, std::string end, std::set<std::
 }
 
 
-void MatchUtils::compute_sets(std::unordered_map<std::string, std::vector<Match> >& all_matches, std::string start, std::string current, std::string end, std::map<std::pair<std::string,std::string>, std::set<std::string> >& bubble_sets, std::set<std::string> seen){
+void MatchUtils::compute_sets(std::unordered_map<std::string, std::vector<Match> >& all_matches, std::string start, std::string current, std::string end, std::map<std::pair<std::string,std::string>, std::unordered_set<std::string> >& bubble_sets, std::unordered_set<std::string> seen){
     if(current == end){
         // Reached the node we care about, add the nodes we've seen on the path to here
         bubble_sets[make_pair(start,end)].insert(seen.begin(), seen.end());
@@ -2025,9 +2025,9 @@ void MatchUtils::compute_sets(std::unordered_map<std::string, std::vector<Match>
     }
 }
 
-void MatchUtils::compute_in_out_degree(std::unordered_map<std::string, std::unordered_map<std::string, Match> >& all_matches, std::set<std::string>& read_ids, std::unordered_map<std::string, std::vector<std::string> >& read_indegree, std::unordered_map<std::string, std::vector<std::string> >& read_outdegree)
+void MatchUtils::compute_in_out_degree(std::unordered_map<std::string, std::unordered_map<std::string, Match> >& all_matches, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, std::vector<std::string> >& read_indegree, std::unordered_map<std::string, std::vector<std::string> >& read_outdegree)
 {
-    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
     	std::vector<std::string> tmp;
         read_indegree.insert(std::pair<std::string, std::vector<std::string> >(*it,tmp));
@@ -2123,9 +2123,9 @@ void get_path_to_branch(std::vector<std::string>& path, std::string id, std::str
 	}
 }
 
-void MatchUtils::compute_dead_ends(std::set<std::string>& read_ids, std::unordered_map<std::string, std::vector<std::string> >& read_indegree, std::unordered_map<std::string, std::vector<std::string> >& read_outdegree, std::set<std::string>& de_ids, std::unordered_map<std::string, std::vector<std::string> >& de_paths)
+void MatchUtils::compute_dead_ends(std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, std::vector<std::string> >& read_indegree, std::unordered_map<std::string, std::vector<std::string> >& read_outdegree, std::unordered_set<std::string>& de_ids, std::unordered_map<std::string, std::vector<std::string> >& de_paths)
 {
-    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
     {
         if(read_indegree[*it].size() == 0 && read_outdegree[*it].size() == 0)
         {
@@ -2140,7 +2140,7 @@ void MatchUtils::compute_dead_ends(std::set<std::string>& read_ids, std::unorder
         }
     }
 
-    for (std::set<std::string>::iterator it=de_ids.begin(); it!=de_ids.end(); ++it)
+    for (std::unordered_set<std::string>::iterator it=de_ids.begin(); it!=de_ids.end(); ++it)
     {
         // Compute the path from each dead end to the branch it came from.
         // If Dead end node starts path then it is query node, but if it ends path then it is the target node.
@@ -2172,7 +2172,7 @@ void MatchUtils::compute_dead_ends(std::set<std::string>& read_ids, std::unorder
 }
 
 
-int MatchUtils::prune_dead_paths(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::set<std::string>& read_ids, std::unordered_map<std::string, std::vector<std::string> >& read_indegree, std::unordered_map<std::string, std::vector<std::string> >& read_outdegree, std::unordered_map<std::string, std::vector<std::string> >& de_paths, int mean_read_length, int threshold)
+int MatchUtils::prune_dead_paths(std::unordered_map<std::string, std::unordered_map<std::string,Match> >& all_matches, std::unordered_set<std::string>& read_ids, std::unordered_map<std::string, std::vector<std::string> >& read_indegree, std::unordered_map<std::string, std::vector<std::string> >& read_outdegree, std::unordered_map<std::string, std::vector<std::string> >& de_paths, int mean_read_length, int threshold)
 {
     std::unordered_map<std::string, std::vector<int> > branch_count;
     int count = 0;
@@ -2269,13 +2269,13 @@ int MatchUtils::prune_dead_paths(std::unordered_map<std::string, std::unordered_
 void MatchUtils::clean_matches(std::unordered_map<std::string, std::unordered_map<std::string, Match> >& all_matches){
 
     for (std::unordered_map<std::string, std::unordered_map<std::string, Match> >::iterator it=all_matches.begin(); it!=all_matches.end(); ++it){
-        std::set<std::string> to_remove;
+        std::unordered_set<std::string> to_remove;
         for (std::unordered_map<std::string, Match>::iterator it2=it->second.begin(); it2!=it->second.end(); ++it2){
             if(it2->second.reduce){
                 to_remove.insert(it2->first);
             }
         }
-        for (std::set<std::string>::iterator it2=to_remove.begin(); it2!=to_remove.end(); ++it2){
+        for (std::unordered_set<std::string>::iterator it2=to_remove.begin(); it2!=to_remove.end(); ++it2){
             it->second.erase(*it2);
         }
     }
@@ -2475,18 +2475,18 @@ std::vector<Match> get_all_matches_for_node(std::unordered_map<std::string, std:
     return tmp;
 }
 
-void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map<std::string, Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::set<std::string>& read_ids, int fuzz)
+void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map<std::string, Match> >& all_matches, std::unordered_map<std::string, std::vector<std::string>>& matches_indexed, std::unordered_set<std::string>& read_ids, int fuzz)
 {
 	//int fuzz = 3500;
 	int count = 0;
 	std::unordered_map<std::string, int> mark;
     // Myers Transitive Reduction Alg
     //Mark each node as vacant (0) & reduce = false
-    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
+    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
         mark.insert(std::pair<std::string,int>(*it, 0));
     }
 
-    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
+    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
         std::string v = *it;
         // Get a vector that has all the edges that come in/out of v (bidirected edges)
         std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, matches_indexed ,v);

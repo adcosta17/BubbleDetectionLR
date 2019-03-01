@@ -86,9 +86,9 @@ int main(int argc, char** argv)
     // Read in and Parse input file
 	unordered_map<string, unordered_map<string, Match> > all_matches;
     unordered_map<string, unordered_map<string, Match> > raw_matches;
-    set<string> read_ids;
+    unordered_set<string> read_ids;
     unordered_map<string, int> read_lengths;
-    set<string> chimeric_reads;
+    unordered_set<string> chimeric_reads;
     unordered_map<string, Read> read_classification;
     unordered_map<string, float> read_coverage;
     unordered_map<string, string> read_levels;
@@ -96,7 +96,7 @@ int main(int argc, char** argv)
     unordered_map<string, string> read_lowest_taxonomy;
     unordered_map<string, float> classification_avg_coverage;
     unordered_map<string, float> per_species_coverage;
-    unordered_map<string, set<string>> read_groups;
+    unordered_map<string, unordered_set<string>> read_groups;
     unordered_map<string, vector<string>> matches_indexed; 
 
     if(chimeric){
@@ -125,10 +125,10 @@ int main(int argc, char** argv)
                 cerr << "Reading in MPA File" << endl;
                 ifstream inputFile_mpa(mpa_file);
                 unordered_map<string, Read> mpa_read_classification;
-                set<string> classification_set;
+                unordered_set<string> classification_set;
                 unordered_map<string, int> classification_count;
                 classification_set.insert("");
-                set<string> tmp_set;
+                unordered_set<string> tmp_set;
                 read_groups.insert(make_pair("", tmp_set));
                 string line;
                 while (getline(inputFile_mpa, line))
@@ -188,7 +188,7 @@ int main(int argc, char** argv)
                     }
                     read_coverage.insert(make_pair(id, cov));
                     tmp_read_coverage.insert(make_pair(id, cov*len));
-                    for(unordered_map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
+                    for(unordered_map<string, unordered_set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
                     {
                         if(it->second.count(id) > 0){
                             if(num_bases.count(it->first) == 0){
@@ -198,7 +198,7 @@ int main(int argc, char** argv)
                         }
                     }
                 }
-                for(unordered_map<string, set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
+                for(unordered_map<string, unordered_set<string>>::iterator it = read_groups.begin(); it != read_groups.end(); ++it)
                 {
                     per_species_coverage.insert(make_pair(it->first, 0.0));
                     for (unordered_map<string, float>::iterator it2 = tmp_read_coverage.begin(); it2 != tmp_read_coverage.end(); ++it2)
@@ -210,7 +210,7 @@ int main(int argc, char** argv)
         } else if(is_dir(coverage_file.c_str())){
             // Need to compute the per read coverage for each species
             binned = true;
-            set<string> cov_files;
+            unordered_set<string> cov_files;
             DIR *dir;
             struct dirent *ent;
             string suffix = ".read-cov.txt";
@@ -235,7 +235,7 @@ int main(int argc, char** argv)
             cerr << "Found " << cov_files.size() << " Coverage Files" << endl;
 
             // Take the list of paf_files and then for each of them read in the file
-            for (set<string>::iterator it = cov_files.begin(); it != cov_files.end(); ++it) {
+            for (unordered_set<string>::iterator it = cov_files.begin(); it != cov_files.end(); ++it) {
                 unordered_map<string, float> tmp_read_coverage;
                 int num_bases = 0;
                 string cov_fh = *it;
@@ -311,7 +311,7 @@ int main(int argc, char** argv)
         int rm_edge = 0;
         for (int i = 0; i < iterations; ++i)
         {
-            set<string> de_ids;
+            unordered_set<string> de_ids;
             unordered_map<string, vector<string> > de_paths;
             read_indegree.clear();
             read_outdegree.clear();
@@ -341,12 +341,12 @@ int main(int argc, char** argv)
     }
     
     unordered_map<string, string> read_names;
-    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
+    for (unordered_set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             string tmp_string(*it);
             read_names.insert(make_pair(*it, MatchUtils::get_read_string(tmp_string, use_names_as_is)));
     }
     unordered_map<string, string> colours;
-    for (set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
+    for (unordered_set<string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
             colours.insert(make_pair(*it, "#bebebe"));// Grey in RGB Hex
     }
 
@@ -404,8 +404,8 @@ int main(int argc, char** argv)
     if(!skip_bubble){
 	    cerr << "Compute Possible Bubbles" << endl;
 	    //Find Paths to each node from a given start
-	    map<pair<string,string>, set<string> > bubble_sets;
-	    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+	    map<pair<string,string>, unordered_set<string> > bubble_sets;
+	    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
 	    {
 	        //Look for nodes that have at least 2 valid neighbours
 	        if(read_indegree[*it].size() >= 2){
@@ -423,7 +423,7 @@ int main(int argc, char** argv)
 	    cerr << "Validate Possible Bubbles & Pop those that are sequencing error based" << endl;
 	    set<pair<string, string> > seen_bubbles;
 	    if(tax){
-	        for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+	        for (map<pair<string,string>, unordered_set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
 	        {
 	            // Need to find any bubbles that are only true bubbles when taxonomy info is present.
 	            // Idea is that bubbles between regions that are all from the same species or subspecies, with no ambiguity should be popped
@@ -451,7 +451,7 @@ int main(int argc, char** argv)
 	    read_indegree.clear();
 	    read_outdegree.clear();
 	    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-	    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+	    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
 	    {
 	        //Look for nodes that have at least 2 valid neighbours
 	        if(read_indegree[*it].size() >= 2){
@@ -464,7 +464,7 @@ int main(int argc, char** argv)
 	    seen_bubbles.clear();
 	    set<pair<string, string> > collapsed_bubbles;
 	    if(tax){
-	        for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+	        for (map<pair<string,string>, unordered_set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
 	        {
 	            // Need to find any bubbles that are only true bubbles when taxonomy info is present.
 	            // Idea is that bubbles between regions that are all from the same species or subspecies, with no ambiguity should be popped
@@ -493,7 +493,7 @@ int main(int argc, char** argv)
 		    read_indegree.clear();
 		    read_outdegree.clear();
 		    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-		    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+		    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
 		    {
 		        //Look for nodes that have at least 2 valid neighbours
 		        if(read_indegree[*it].size() >= 2){
@@ -511,7 +511,7 @@ int main(int argc, char** argv)
 	    read_indegree.clear();
 	    read_outdegree.clear();
 	    MatchUtils::compute_in_out_degree(all_matches, read_ids, read_indegree, read_outdegree);
-	    for (std::set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
+	    for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it)
 	    {
 	        //Look for nodes that have at least 2 valid neighbours
 	        if(read_indegree[*it].size() >= 2){
@@ -528,7 +528,7 @@ int main(int argc, char** argv)
 	    // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
 	    ofstream bubbleOutput;
 	    bubbleOutput.open(outputFileName+"_bubble_list.txt");
-	    for (map<pair<string,string>, set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
+	    for (map<pair<string,string>, unordered_set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
 	    {    
 	        if((it->first).first == (it->first).second){
 	            // Loop Bubble, don't want to consider this case
@@ -669,7 +669,7 @@ int main(int argc, char** argv)
 	    int rm_edge = 0;
 	    for (int i = 0; i < iterations; ++i)
 	    {
-	        set<string> de_ids;
+	        unordered_set<string> de_ids;
 	        unordered_map<string, vector<string> > de_paths;
 	        read_indegree.clear();
 	        read_outdegree.clear();
