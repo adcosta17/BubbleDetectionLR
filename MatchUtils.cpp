@@ -540,9 +540,9 @@ int MatchUtils::read_and_assemble_paf_dir(std::unordered_map<std::string, std::u
         unordered_set<string> tmp_read_ids;
         string tmp = *it;
 		get_contained_and_chimeric_reads(to_drop, chimeric_reads, tmp_read_ids, tmp, false, use_names_as_is);
-
+        cerr << "Got Contained for " << tmp << endl;
     }
-
+    cerr << "Found " << to_drop.size() << " Contained Reads" << endl;
     unordered_map<string, vector<string> > read_indegree;
     unordered_map<string, vector<string> > read_outdegree;
     int mean_read_length = 0;
