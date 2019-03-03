@@ -2528,10 +2528,10 @@ void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map
 	                rlongest = it2->second.length;
 	            }
 	        } else{
-	        	if(it2->second.length > flongest && it2->second.orientation < 0){
+	        	if(it2->second.prefix_length > flongest && it2->second.orientation < 0){
 	                flongest = it2->second.prefix_length;
 	            }
-	            if(it2->second.length > rlongest && it2->second.orientation > 0){
+	            if(it2->second.prefix_length > rlongest && it2->second.orientation > 0){
 	                rlongest = it2->second.prefix_length;
 	            }
 	        }
@@ -2545,10 +2545,10 @@ void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map
 	                rlongest = all_matches[matches_indexed[v][j]][v].length;
 	            }
 	        } else {
-	        	if(all_matches[matches_indexed[v][j]][v].length > flongest && all_matches[matches_indexed[v][j]][v].orientation < 0){
+	        	if(all_matches[matches_indexed[v][j]][v].prefix_length > flongest && all_matches[matches_indexed[v][j]][v].orientation < 0){
 	                flongest = all_matches[matches_indexed[v][j]][v].prefix_length;
 	            }
-	            if(all_matches[matches_indexed[v][j]][v].length > rlongest && all_matches[matches_indexed[v][j]][v].orientation > 0){
+	            if(all_matches[matches_indexed[v][j]][v].prefix_length > rlongest && all_matches[matches_indexed[v][j]][v].orientation > 0){
 	                rlongest = all_matches[matches_indexed[v][j]][v].prefix_length;
 	            }
 	        }
