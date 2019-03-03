@@ -2467,10 +2467,22 @@ std::vector<Match> get_all_matches_for_node(std::unordered_map<std::string, std:
     std::vector<Match> tmp;
     // First get all v
     for (std::unordered_map<std::string, Match>::iterator it= all_matches[v].begin(); it!=all_matches[v].end(); ++it){
-    	tmp.push_back(it->second);
+    	if(it->second.target_read_id == v){
+    		Match tmp_match = Match(it->second.target_read_id, it->second.target_read_length, it->second.target_read_start, it->second.target_read_end,
+                        it->second.strand, it->second.query_read_id, it->second.query_read_length, it->second.query_read_start, it->second.query_read_end, 0, 0, 0, 0, "");
+            tmp.push_back(tmp_match);
+    	} else {
+    		tmp.push_back(it->second);
+    	}
     }
     for(std::size_t j = 0; j < matches_indexed[v].size(); j++){
-        tmp.push_back(all_matches[matches_indexed[v][j]][v]);
+        if(all_matches[matches_indexed[v][j]][v].target_read_id == v){
+    		Match tmp_match = Match(all_matches[matches_indexed[v][j]][v].target_read_id, all_matches[matches_indexed[v][j]][v].target_read_length, all_matches[matches_indexed[v][j]][v].target_read_start, all_matches[matches_indexed[v][j]][v].target_read_end,
+                        all_matches[matches_indexed[v][j]][v].strand, all_matches[matches_indexed[v][j]][v].query_read_id, all_matches[matches_indexed[v][j]][v].query_read_length, all_matches[matches_indexed[v][j]][v].query_read_start, all_matches[matches_indexed[v][j]][v].query_read_end, 0, 0, 0, 0, "");
+            tmp.push_back(tmp_match);
+    	} else {
+    		tmp.push_back(all_matches[matches_indexed[v][j]][v]);
+    	}
     }
     return tmp;
 }
@@ -2489,278 +2501,138 @@ void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map
     for (std::unordered_set<std::string>::iterator it=read_ids.begin(); it!=read_ids.end(); ++it){
         std::string v = *it;
         // Get a vector that has all the edges that come in/out of v (bidirected edges)
-        //std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, matches_indexed ,v);
+        std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, matches_indexed ,v);
         int flongest = 0;
         int rlongest = 0;
-        for (std::unordered_map<std::string, Match>::iterator it2= all_matches[v].begin(); it2!=all_matches[v].end(); ++it2){
-        	if(v == it2->second.query_read_id){
-            	mark[it2->second.target_read_id] = 1;
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
+        {	
+        	// First compute the suffix/edge length and store it in the match, relative to a specific read
+        	// Needed so we can sort by increasing distance
+        	//v_to_w[i].set_length(v);
+        	//v_to_w[i].set_orientation(v);
+            // Set all w for each edge v->w as in play
+            //if(v_to_w[i].reduce){
+            //	std::cerr << "Found Already reduced edge from: " << v_to_w[i].query_read_id << " to " << v_to_w[i].target_read_id << std::endl;
+            //	continue;
+            //}
+        	if(v == v_to_w[i].query_read_id){
+            	mark[v_to_w[i].target_read_id] = 1;
         	} else {
-        		mark[it2->second.query_read_id] = 1;
+        		mark[v_to_w[i].query_read_id] = 1;
         	}
         }
-        for(std::size_t j = 0; j < matches_indexed[v].size(); j++){
-        	if(v == all_matches[matches_indexed[v][j]][v].query_read_id){
-            	mark[all_matches[matches_indexed[v][j]][v].target_read_id] = 1;
-        	} else {
-        		mark[all_matches[matches_indexed[v][j]][v].query_read_id] = 1;
-        	}
-    	}
-        //Match::sort_matches(v_to_w);
-        //for (std::size_t i = 0; i < v_to_w.size(); ++i)
-        //{
+        Match::sort_matches(v_to_w);
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
+        {
         	//if(v_to_w[i].reduce){
         	//	continue;
         	//}
-        //	if(v_to_w[i].length > flongest && v_to_w[i].orientation > 0){
-        //        flongest = v_to_w[i].length;
-        //    }
-         //   if(v_to_w[i].length > rlongest && v_to_w[i].orientation < 0){
-         //       rlongest = v_to_w[i].length;
-         //   }
-        //}
-        for (std::unordered_map<std::string, Match>::iterator it2= all_matches[v].begin(); it2!=all_matches[v].end(); ++it2){
-        	if(v == it2->second.query_read_id){
-	        	if(it2->second.length > flongest && it2->second.orientation > 0){
-	                flongest = it2->second.length;
-	            }
-	            if(it2->second.length > rlongest && it2->second.orientation < 0){
-	                rlongest = it2->second.length;
-	            }
-	        } else{
-	        	if(it2->second.prefix_length > flongest && it2->second.orientation < 0){
-	                flongest = it2->second.prefix_length;
-	            }
-	            if(it2->second.prefix_length > rlongest && it2->second.orientation > 0){
-	                rlongest = it2->second.prefix_length;
-	            }
-	        }
+        	if(v_to_w[i].length > flongest && v_to_w[i].orientation > 0){
+                flongest = v_to_w[i].length;
+            }
+            if(v_to_w[i].length > rlongest && v_to_w[i].orientation < 0){
+                rlongest = v_to_w[i].length;
+            }
         }
-        for(std::size_t j = 0; j < matches_indexed[v].size(); j++){
-        	if(v == all_matches[matches_indexed[v][j]][v].query_read_id){
-	        	if(all_matches[matches_indexed[v][j]][v].length > flongest && all_matches[matches_indexed[v][j]][v].orientation > 0){
-	                flongest = all_matches[matches_indexed[v][j]][v].length;
-	            }
-	            if(all_matches[matches_indexed[v][j]][v].length > rlongest && all_matches[matches_indexed[v][j]][v].orientation < 0){
-	                rlongest = all_matches[matches_indexed[v][j]][v].length;
-	            }
-	        } else {
-	        	if(all_matches[matches_indexed[v][j]][v].prefix_length > flongest && all_matches[matches_indexed[v][j]][v].orientation < 0){
-	                flongest = all_matches[matches_indexed[v][j]][v].prefix_length;
-	            }
-	            if(all_matches[matches_indexed[v][j]][v].prefix_length > rlongest && all_matches[matches_indexed[v][j]][v].orientation > 0){
-	                rlongest = all_matches[matches_indexed[v][j]][v].prefix_length;
-	            }
-	        }
-    	}
         flongest += fuzz;
         rlongest += fuzz;
-
-        for (std::unordered_map<std::string, Match>::iterator it2= all_matches[v].begin(); it2!=all_matches[v].end(); ++it2)
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
         {
         	int longest = 0;
-        	if(it2->second.orientation < 0){
+        	//if(v_to_w[i].reduce){
+        		//std::cerr << v_to_w[i].target_read_id << " " << v_to_w[i].query_read_id	<< " " << v_to_w[i].type << std::endl;
+        	//	continue;
+        	//}
+        	if(v_to_w[i].orientation < 0){
         		longest = rlongest;
         	} else {
         		longest = flongest;
         	}
             // if w in v->w in play
             std::string w;
-            if(it2->second.query_read_id == v){
-            	w = it2->second.target_read_id;
+            if(v_to_w[i].query_read_id == v){
+            	w = v_to_w[i].target_read_id;
             } else {
-            	w  = it2->second.query_read_id;
+            	w  = v_to_w[i].query_read_id;
             }
             if(mark[w] == 1){
-                for (std::unordered_map<std::string, Match>::iterator it3= all_matches[w].begin(); it3!=all_matches[w].end(); ++it3)
+                //std::cerr << "  " << w << std::endl;
+                std::vector<Match> w_to_x = get_all_matches_for_node(all_matches, matches_indexed, w);
+        		//MatchUtils::get_all_matches_for_node(all_matches, w, w_to_x);
+        		//for (int j = 0; j < w_to_x.size(); j++)
+                //{
+                	//w_to_x[j].set_length(w);
+        			//w_to_x[j].set_orientation(w);
+                	//std::cerr << v << " to " << w_to_x[j].query_read_id << " " << w_to_x[j].target_read_id << " " << v_to_w[i].suffix_length + w_to_x[j].suffix_length << " " << longest << std::endl;
+                //}
+                Match::sort_matches(w_to_x);
+                for (std::size_t j = 0; j < w_to_x.size(); ++j)
                 {
-		            if(it2->second.strand == '-'){
+		            //if(w_to_x[j].reduce){ // ||w_to_x[j].orientation != v_to_w[i].orientation){
+		            	// v to w is in one direction, but w to x is in the wrong direction, so ignore it
+		            	//mark[w_to_x[j].target_read_id] = -1;
+		            	//std::cerr << "A0 Oreintation off " << v << " to " << w_to_x[j].target_read_id << std::endl;
+		            	//std::cerr << w_to_x[j].target_read_id << " " << w_to_x[j].query_read_id	<< " " << w_to_x[j].type << std::endl;
+		            //	continue;
+		            //}
+		            if(v_to_w[i].strand == '-'){
 		            	// w is now flipped, so any w to x that is + is really - in the eyes of v 
-		            	if(it3->second.orientation == it2->second.orientation){
+		            	if(w_to_x[j].orientation == v_to_w[i].orientation){
 		            		continue;
 		            	}
-		            } else if(it3->second.orientation != it2->second.orientation){
+		            } else if(w_to_x[j].orientation != v_to_w[i].orientation){
 		            	continue;
 		            }
-                	if(w == it3->second.query_read_id){
-                		if(v == it3->second.target_read_id){
-		            		//Same edge just reversed, Don't need to remove yourself
-		            		continue;
-		            	}
-		            	if(it2->second.length + it3->second.length <= longest){
-		                	if(mark[it3->second.target_read_id] == 1){
-		                    	mark[it3->second.target_read_id] = -1;
-		                	}
-		            	}
-                	} else {
-                		if(v == it3->second.query_read_id){
-		            		//Same edge just reversed, Don't need to remove yourself
-		            		continue;
-		            	}
-		            	if(it2->second.length + it3->second.prefix_length <= longest){
-		                	if(mark[it3->second.query_read_id] == 1){
-		                    	mark[it3->second.query_read_id] = -1;
-		                	}
-		            	}
-                	}
-                }
-
-                for(std::size_t j = 0; j < matches_indexed[w].size(); j++)
-                {
-		            if(it2->second.strand == '-'){
-		            	// w is now flipped, so any w to x that is + is really - in the eyes of v 
-		            	if(all_matches[matches_indexed[w][j]][w].orientation == it2->second.orientation){
-		            		continue;
-		            	}
-		            } else if(all_matches[matches_indexed[w][j]][w].orientation != it2->second.orientation){
-		            	continue;
-		            }
-                	if(w == all_matches[matches_indexed[w][j]][w].query_read_id){
-                		if(v == all_matches[matches_indexed[w][j]][w].target_read_id){
-		            		//Same edge just reversed, Don't need to remove yourself
-		            		continue;
-		            	}
-		            	if(it2->second.length + all_matches[matches_indexed[w][j]][w].length <= longest){
-		                	if(mark[all_matches[matches_indexed[w][j]][w].target_read_id] == 1){
-		                    	mark[all_matches[matches_indexed[w][j]][w].target_read_id] = -1;
-		                	}
-		            	} 
-                	} else {
-                		if(v == all_matches[matches_indexed[w][j]][w].query_read_id){
-		            		//Same edge just reversed, Don't need to remove yourself
-		            		continue;
-		            	}
-		            	if(it2->second.length + all_matches[matches_indexed[w][j]][w].prefix_length <= longest){
-		                	if(mark[all_matches[matches_indexed[w][j]][w].query_read_id] == 1){
-		                    	mark[all_matches[matches_indexed[w][j]][w].query_read_id] = -1;
-		                	}
-		            	}
-                	}
-                }
-            }
-        }
-
-        for(std::size_t i = 0; i < matches_indexed[v].size(); i++)
-        {
-        	int longest = 0;
-        	if(all_matches[matches_indexed[v][i]][v].orientation < 0){
-        		longest = rlongest;
-        	} else {
-        		longest = flongest;
-        	}
-            // if w in v->w in play
-            std::string w;
-            if(all_matches[matches_indexed[v][i]][v].query_read_id == v){
-            	w = all_matches[matches_indexed[v][i]][v].target_read_id;
-            } else {
-            	w  = all_matches[matches_indexed[v][i]][v].query_read_id;
-            }
-            if(mark[w] == 1){
-                for (std::unordered_map<std::string, Match>::iterator it3= all_matches[w].begin(); it3!=all_matches[w].end(); ++it3)
-                {
-		            if(all_matches[matches_indexed[v][i]][v].strand == '-'){
-		            	// w is now flipped, so any w to x that is + is really - in the eyes of v 
-		            	if(it3->second.orientation == all_matches[matches_indexed[v][i]][v].orientation){
-		            		continue;
-		            	}
-		            } else if(it3->second.orientation != all_matches[matches_indexed[v][i]][v].orientation){
-		            	continue;
-		            }
-                	if(w == it3->second.query_read_id){
+                	if(w == w_to_x[j].query_read_id){
                 		//std::cerr << v << " to " << w_to_x[j].query_read_id << " " << w_to_x[j].target_read_id << std::endl;
-                		if(v == it3->second.target_read_id){
+                		if(v == w_to_x[j].target_read_id){
 		            		//Same edge just reversed, Don't need to remove yourself
 		                  //  std::cerr << "Reversed " << v << std::endl;
 		            		continue;
 		            	}
 		                //std::cerr << "For " << v << " Check " << w << " to " << all_matches[w][j].target_read_id << std::endl;
-		            	if(all_matches[matches_indexed[v][i]][v].length + it3->second.length <= longest){
-		                	if(mark[it3->second.target_read_id] == 1){
-		                    	mark[it3->second.target_read_id] = -1;
+		            	if(v_to_w[i].length + w_to_x[j].length <= longest){
+		                	if(mark[w_to_x[j].target_read_id] == 1){
+		                    	mark[w_to_x[j].target_read_id] = -1;
 		                    //    std::cerr << "A1. Marking: " << v << " to " << w_to_x[j].target_read_id << " For reduction" << std::endl;
 		                	}
+		            	} else {
+		            		break;
 		            	}
                 	} else {
                 		//std::cerr << v << " to " << w_to_x[j].target_read_id << " " << w_to_x[j].query_read_id << std::endl;
-                		if(v == it3->second.query_read_id){
+                		if(v == w_to_x[j].query_read_id){
 		            		//Same edge just reversed, Don't need to remove yourself
 		                    //std::cerr << "Reversed " << v << std::endl;
 		            		continue;
 		            	}
 		                //std::cerr << "For " << v << " Check " << w << " to " << all_matches[w][j].target_read_id << std::endl;
-		            	if(all_matches[matches_indexed[v][i]][v].length + it3->second.prefix_length <= longest){
-		                	if(mark[it3->second.query_read_id] == 1){
-		                    	mark[it3->second.query_read_id] = -1;
+		            	if(v_to_w[i].length + w_to_x[j].length <= longest){
+		                	if(mark[w_to_x[j].query_read_id] == 1){
+		                    	mark[w_to_x[j].query_read_id] = -1;
 		                       //std::cerr << "A2. Marking: " << v << " to " << w_to_x[j].query_read_id << " For reduction" << std::endl;
 		                	}
+		            	} else {
+		            		break;
 		            	}
                 	}
-                }
 
-                for(std::size_t j = 0; j < matches_indexed[w].size(); j++)
-                {
-		            if(all_matches[matches_indexed[v][i]][v].strand == '-'){
-		            	// w is now flipped, so any w to x that is + is really - in the eyes of v 
-		            	if(all_matches[matches_indexed[w][j]][w].orientation == all_matches[matches_indexed[v][i]][v].orientation){
-		            		continue;
-		            	}
-		            } else if(all_matches[matches_indexed[w][j]][w].orientation != all_matches[matches_indexed[v][i]][v].orientation){
-		            	continue;
-		            }
-                	if(w == all_matches[matches_indexed[w][j]][w].query_read_id){
-                		//std::cerr << v << " to " << w_to_x[j].query_read_id << " " << w_to_x[j].target_read_id << std::endl;
-                		if(v == all_matches[matches_indexed[w][j]][w].target_read_id){
-		            		//Same edge just reversed, Don't need to remove yourself
-		                  //  std::cerr << "Reversed " << v << std::endl;
-		            		continue;
-		            	}
-		                //std::cerr << "For " << v << " Check " << w << " to " << all_matches[w][j].target_read_id << std::endl;
-		            	if(all_matches[matches_indexed[v][i]][v].length + all_matches[matches_indexed[w][j]][w].length <= longest){
-		                	if(mark[all_matches[matches_indexed[w][j]][w].target_read_id] == 1){
-		                    	mark[all_matches[matches_indexed[w][j]][w].target_read_id] = -1;
-		                    //    std::cerr << "A1. Marking: " << v << " to " << w_to_x[j].target_read_id << " For reduction" << std::endl;
-		                	}
-		            	} 
-                	} else {
-                		//std::cerr << v << " to " << w_to_x[j].target_read_id << " " << w_to_x[j].query_read_id << std::endl;
-                		if(v == all_matches[matches_indexed[w][j]][w].query_read_id){
-		            		//Same edge just reversed, Don't need to remove yourself
-		                    //std::cerr << "Reversed " << v << std::endl;
-		            		continue;
-		            	}
-		                //std::cerr << "For " << v << " Check " << w << " to " << all_matches[w][j].target_read_id << std::endl;
-		            	if(all_matches[matches_indexed[v][i]][v].length + all_matches[matches_indexed[w][j]][w].prefix_length <= longest){
-		                	if(mark[all_matches[matches_indexed[w][j]][w].query_read_id] == 1){
-		                    	mark[all_matches[matches_indexed[w][j]][w].query_read_id] = -1;
-		                       //std::cerr << "A2. Marking: " << v << " to " << w_to_x[j].query_read_id << " For reduction" << std::endl;
-		                	}
-		            	}
-                	}
                 }
             }
         }
 
         count += mark_matches_for_node(all_matches, v, mark);
-        for (std::unordered_map<std::string, Match>::iterator it2= all_matches[v].begin(); it2!=all_matches[v].end(); ++it2){
-        	if(it2->second.reduce){
-            	continue;
+        for (std::size_t i = 0; i < v_to_w.size(); ++i)
+        {
+        	if(v_to_w[i].reduce){
+        		continue;
         	}
-        	if(v == it2->second.query_read_id){
-		        mark[it2->second.target_read_id] = 0;
+        	if(v == v_to_w[i].query_read_id){
+		        mark[v_to_w[i].target_read_id] = 0;
 		    } else {
-		    	mark[it2->second.query_read_id] = 0;
+		    	mark[v_to_w[i].query_read_id] = 0;
 		    }
         }
-        for(std::size_t j = 0; j < matches_indexed[v].size(); j++){
-        	if(all_matches[matches_indexed[v][j]][v].reduce){
-            	continue;
-        	}
-        	if(v == all_matches[matches_indexed[v][j]][v].query_read_id){
-		        mark[all_matches[matches_indexed[v][j]][v].target_read_id] = 0;
-		    } else {
-		    	mark[all_matches[matches_indexed[v][j]][v].query_read_id] = 0;
-		    }
-    	}
     }
     std::cerr << "\tReduced " << count << " edges" << std::endl;
 }
