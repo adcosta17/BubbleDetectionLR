@@ -2492,23 +2492,6 @@ void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map
         //std::vector<Match> v_to_w = get_all_matches_for_node(all_matches, matches_indexed ,v);
         int flongest = 0;
         int rlongest = 0;
-        //for (std::size_t i = 0; i < v_to_w.size(); ++i)
-        //{	
-        	// First compute the suffix/edge length and store it in the match, relative to a specific read
-        	// Needed so we can sort by increasing distance
-        	//v_to_w[i].set_length(v);
-        	//v_to_w[i].set_orientation(v);
-            // Set all w for each edge v->w as in play
-            //if(v_to_w[i].reduce){
-            //	std::cerr << "Found Already reduced edge from: " << v_to_w[i].query_read_id << " to " << v_to_w[i].target_read_id << std::endl;
-            //	continue;
-            //}
-        //	if(v == v_to_w[i].query_read_id){
-        //    	mark[v_to_w[i].target_read_id] = 1;
-       // 	} else {
-       // 		mark[v_to_w[i].query_read_id] = 1;
-        //	}
-        //}
         for (std::unordered_map<std::string, Match>::iterator it2= all_matches[v].begin(); it2!=all_matches[v].end(); ++it2){
         	if(v == it2->second.query_read_id){
             	mark[it2->second.target_read_id] = 1;
@@ -2545,10 +2528,10 @@ void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map
 	                rlongest = it2->second.length;
 	            }
 	        } else{
-	        	if(it2->second.length > flongest && it2->second.orientation > 0){
+	        	if(it2->second.length > flongest && it2->second.orientation < 0){
 	                flongest = it2->second.prefix_length;
 	            }
-	            if(it2->second.length > rlongest && it2->second.orientation < 0){
+	            if(it2->second.length > rlongest && it2->second.orientation > 0){
 	                rlongest = it2->second.prefix_length;
 	            }
 	        }
@@ -2562,10 +2545,10 @@ void MatchUtils::reduce_edges(std::unordered_map<std::string, std::unordered_map
 	                rlongest = all_matches[matches_indexed[v][j]][v].length;
 	            }
 	        } else {
-	        	if(all_matches[matches_indexed[v][j]][v].length > flongest && all_matches[matches_indexed[v][j]][v].orientation > 0){
+	        	if(all_matches[matches_indexed[v][j]][v].length > flongest && all_matches[matches_indexed[v][j]][v].orientation < 0){
 	                flongest = all_matches[matches_indexed[v][j]][v].prefix_length;
 	            }
-	            if(all_matches[matches_indexed[v][j]][v].length > rlongest && all_matches[matches_indexed[v][j]][v].orientation < 0){
+	            if(all_matches[matches_indexed[v][j]][v].length > rlongest && all_matches[matches_indexed[v][j]][v].orientation > 0){
 	                rlongest = all_matches[matches_indexed[v][j]][v].prefix_length;
 	            }
 	        }
