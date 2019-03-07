@@ -2,9 +2,9 @@
 
 Genome assembly and Bubble Detection for Nanopore long reads
 
-BubbleDetect is designed to take in a set of all v all overlaps, lay them out in an assembly graph and compute the bubbles that occur within them. Each bubble is scored based on a number of characterisitcs including taxinomic classification and coverage if provided by the user. The assembly generated is outputted along with the bubble list to a user specified location.  
+BubbleDetect is designed to take in a set of all v all overlaps, lay them out in an assembly graph and compute the bubbles that occur within them. Each bubble is scored based on a number of characteristics including taxonomic classification and coverage if provided by the user. The assembly generated is outputted along with the bubble list to a user specified location.  
 
-## Dependancies
+## Dependencies
 - ZLib
 - Boost
 
@@ -22,7 +22,7 @@ cd BubbleDetectionLR && make
 # Basic Usage:
 ./BubbleDetect -p all_v_all.paf -o output/path/and/prefix
 
-# With Taxinomic Classification and Coverage
+# With Taxonomic Classification and Coverage
 ./BubbleDetect -p all_v_all.paf -o output/path/and/prefix -r read_classification.txt -s species_to_colour.txt -c coverage_per_read.txt
 
 # Input is a directory of paf files
@@ -51,15 +51,15 @@ cd BubbleDetectionLR && make
 
 **-t** The multiple of the mean read length to use as a minimum size needed to retain a dead end or tip [5]
 
-**-r** Read classification file, tab delimited. Reads as first column, taxinomic classification as second. Levels of classification separated by ;
+**-r** Read classification file, tab delimited. Reads as first column, taxonomic classification as second. Levels of classification separated by ;
 
-**-s** Species to colour map. Provides a RGB hex clode for each species of interest for colouring the output GFA
+**-s** Species to colour map. Provides a RGB hex code for each species of interest for colouring the output GFA
 
-**-h** Chimeric read map. Tab deliminted. Reads as first coloumn, Call as chimeric or not in second
+**-h** Chimeric read map. Tab delimited. Reads as first column, Call as chimeric or not in second
 
-**-c** Coverage per read. Tab deliminited. Reads as first column, Lengths as second. Coverage as third
+**-c** Coverage per read. Tab delimited. Reads as first column, Lengths as second. Coverage as third
 
-**-m** Secondary classification file. Used for when reads are binned by a taxinomic group. Each read is classified to a set taxinomic level if possible (if using kraken it is in MPA format). Reads as first column, taxinomic classification as second. Levels of classification separated by |
+**-m** Secondary classification file. Used for when reads are binned by a taxonomic group. Each read is classified to a set taxonomic level if possible (if using kraken it is in MPA format). Reads as first column, taxonomic classification as second. Levels of classification separated by |
 
 **-g** Total estimated genome size, when passed in NG50 is used instead of N50
 
@@ -67,8 +67,10 @@ cd BubbleDetectionLR && make
 
 **-z** Use read names as is. Read names are assumed to be 32 hexchar nanopore read ids. These will normally be compressed. If flag is passed compression is skipped. [False]
 
-**-b** Denotes input directory passed in represents a set of paf files where each file represents overlaps within a species or other taxinomic level. Reads are assembled within each species and the graphs combined. [False]
+**-b** Denotes input directory passed in represents a set of paf files where each file represents overlaps within a species or other taxonomic level. Reads are assembled within each species and the graphs combined. [False]
 
 **-l** Compute GFA file of collapsed contigs. Normally GFA file output is at read level. Here a second GFA file is generated with read overlaps collapsed to contigs. [False]
 
 **-a** Flag to skip computing assembly stats such as N50. Done if only a read level GFA is needed. [False]
+
+
