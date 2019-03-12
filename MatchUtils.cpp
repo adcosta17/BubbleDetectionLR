@@ -1533,7 +1533,7 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
     std::map<std::pair<std::string,std::string>, std::set<std::string>> bubbles;
     std::pair<std::string,std::string> end = std::make_pair("","");
     visited.insert(start);
-    bool print = true;
+    bool print = false;
     //if(start == "1916" || start == "1807"){
     //    print = true;
     //}
