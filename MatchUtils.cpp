@@ -1528,12 +1528,12 @@ void MatchUtils::remove_edge(std::unordered_map<std::string, std::unordered_map<
 
 void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,std::vector<std::string> >& read_indegree, std::unordered_map<std::string,std::vector<std::string> >& read_outdegree, std::map<std::pair<std::string,std::string>, std::unordered_set<std::string> >& bubble_sets, std::vector<std::string>& start_ids){
 
-    std::unordered_set<std::string> visited;
+    std::set<std::string> visited;
     std::list<std::pair<std::string,std::string> > q;
-    std::map<std::pair<std::string,std::string>, std::unordered_set<std::string>> bubbles;
+    std::map<std::pair<std::string,std::string>, std::set<std::string>> bubbles;
     std::pair<std::string,std::string> end = std::make_pair("","");
     visited.insert(start);
-    bool print = false;
+    bool print = true;
     //if(start == "1916" || start == "1807"){
     //    print = true;
     //}
@@ -1593,7 +1593,7 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
     // Once we have a node that we have already seen, backtrack and compute the set of visited nodes via a BFS from node we've already seen to the start node
     // Know that 2 paths exist, as proven in the first half so we should be able to find them.
     // Can take the two visited sets and do a intersection, giving us the set of nodes that is on the path between the two exactly
-    for(std::map<std::pair<std::string,std::string>, std::unordered_set<std::string>>::iterator it = bubbles.begin(); it != bubbles.end(); it++){
+    for(std::map<std::pair<std::string,std::string>, std::set<std::string>>::iterator it = bubbles.begin(); it != bubbles.end(); it++){
         visited = it->second;
         end = it->first;
         if(end.first != ""){
@@ -1601,7 +1601,7 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
                 std::cout << "Possible Bubble between: " << start << " and " << end.first << std::endl;
             }
             q.clear();
-            std::unordered_set<std::string> visited_back;
+            std::set<std::string> visited_back;
             visited_back.insert(end.first);
             // Need to check on the direction of our end node, see what the predacesor was and if it is in indegreee or outdegree
             if(std::find(read_indegree[end.first].begin(), read_indegree[end.first].end(), end.second) != read_indegree[end.first].end()){
@@ -1644,6 +1644,9 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
                                 }
                                 std::unordered_set<std::string> combined;
                                 std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
+                                if(print){
+                                    std::cout << visited.size() << " " << visited_back.size() << " " <<combined.size() << std::endl;
+                                }
                                 bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::unordered_set<std::string>>(make_pair(bubble_end, end.first), combined));
                                 q.clear();
                                 break;
@@ -1665,6 +1668,9 @@ void MatchUtils::find_bubble(std::string start, std::unordered_map<std::string,s
                                 }
                                 std::unordered_set<std::string> combined;
                                 std::set_intersection(visited.begin(), visited.end(), visited_back.begin(), visited_back.end(), std::inserter(combined, combined.begin()));
+                                if(print){
+                                    std::cout << visited.size() << " " << visited_back.size() << " " <<combined.size() << std::endl;
+                                }
                                 bubble_sets.insert(std::pair<std::pair<std::string,std::string>, std::unordered_set<std::string>>(make_pair(bubble_end, end.first), combined));
                                 q.clear();
                                 break;

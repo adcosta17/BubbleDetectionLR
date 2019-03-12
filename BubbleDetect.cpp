@@ -528,6 +528,7 @@ int main(int argc, char** argv)
 	    // Will also check that all reads in the set that aren't the two ends don't have any incoming or outgoing edges that are to reads not in the set
 	    ofstream bubbleOutput;
 	    bubbleOutput.open(outputFileName+"_bubble_list.txt");
+        cerr << bubble_sets.size() << endl;
 	    for (map<pair<string,string>, unordered_set<string> >::iterator it=bubble_sets.begin(); it!=bubble_sets.end(); ++it)
 	    {    
 	        if((it->first).first == (it->first).second){
@@ -570,11 +571,11 @@ int main(int argc, char** argv)
 	                    continue;
 	                }    
 	        
-	                /*
+	                
 	                //print out bubble arms for valid bubbles
-	                cerr << endl;
+	                //cerr << endl;
 	                cerr << "Arms for bubble between " << (it->first).first << " and " << (it->first).second << endl;
-	                for(int k = 0; k < arms[i].size(); k++){
+	                /*for(int k = 0; k < arms[i].size(); k++){
 	                    cerr << arms[i][k] << " ";
 	                }
 	                cerr << endl;
@@ -616,7 +617,7 @@ int main(int argc, char** argv)
                 //float weights[7] = {0.0074516, -0.0076223, -0.3106360, 0.1244762, -0.0040885, 0.2389054, -0.0002485};
                 //float score = 0.0542166;
                 float weights[7] = {0.0016567, -0.0186906, -0.3297657, 0.1147658, 0, 0.2879531,-0.0004619};
-		float score = 0.3454175;
+		        float score = 0.3454175;
                 score += weights[0]*(tmp_arms[0].size()+tmp_arms[1].size());
                 if(true_bubble){
                     score += weights[1];
