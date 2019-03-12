@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
         int c2, c3, c4, c7, c8, c9, c10, c11, qual;
         lin >> id >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11 >> qual;
 
-        Alignment tmp_aln(id, c2, c3, c4, qual);
+        Alignment tmp_aln(id, c11, c3, c4, qual);
 
         if(all_alignments.count(id) == 0){
             Read_Alignment tmp(id, c2);
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         int c2, c3, c4, c7, c8, c9, c10, c11, qual;
         lin >> id >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11 >> qual;
 
-        Alignment tmp_aln(id, c2, c3, c4, qual);
+        Alignment tmp_aln(id, c11, c3, c4, qual);
 
         if(all_alignments.count(id) == 0){
             Read_Alignment tmp(id, c2);

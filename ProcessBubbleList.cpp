@@ -50,12 +50,12 @@ int main(int argc, char** argv) {
         int c2, c3, c4, c7, c8, c9, c10, c11, qual;
         lin >> id >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11 >> qual;
 
-        Alignment tmp_aln(id, c2, c3, c4, qual);
+        Alignment tmp_aln(id, c11, c3, c4, qual);
 
         if(all_alignments.count(id) == 0){
             Read_Alignment tmp(id, c2);
-	    vector<Alignment> tmp_vec;
-	    tmp.species1_aln = tmp_vec;
+            vector<Alignment> tmp_vec;
+            tmp.species1_aln = tmp_vec;
             all_alignments.insert(make_pair(id, tmp));
         }
         all_alignments.at(id).species1_aln.push_back(tmp_aln);
@@ -71,11 +71,11 @@ int main(int argc, char** argv) {
         int c2, c3, c4, c7, c8, c9, c10, c11, qual;
         lin >> id >> c2 >> c3 >> c4 >> c5 >> c6 >> c7 >> c8 >> c9 >> c10 >> c11 >> qual;
 
-        Alignment tmp_aln(id, c2, c3, c4, qual);
+        Alignment tmp_aln(id, c11, c3, c4, qual);
 
         if(all_alignments.count(id) == 0){
             Read_Alignment tmp(id, c2);
-	    vector<Alignment> tmp_vec;
+            vector<Alignment> tmp_vec;
             tmp.species2_aln = tmp_vec;
             all_alignments.insert(make_pair(id, tmp));
         }
