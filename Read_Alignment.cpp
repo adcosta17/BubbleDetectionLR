@@ -16,7 +16,7 @@ bool Read_Alignment::align_species_1(){
 	}
 	for(std::size_t i = 0; i < species1_aln.size(); i++){
 		if(species1_aln[i].qual > 30){
-			if((species1_aln[i].length >= length)) {
+			if((species1_aln[i].length >= length - 100)) {
 				return true;
 			}
 		}
@@ -32,7 +32,7 @@ bool Read_Alignment::align_species_2(){
 	}
 	for(std::size_t i = 0; i < species2_aln.size(); i++){
 		if(species2_aln[i].qual > 30){
-			if((species2_aln[i].length >= length)) {
+			if((species2_aln[i].length >= length - 100)) {
 				return true;
 			}
 		}
