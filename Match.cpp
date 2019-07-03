@@ -58,6 +58,7 @@ Match::Match(std::string qrid, int qrl, int qrs, int qre,
 	}
 
 bool Match::internal_edge(){
+	// Adapted from Heng Li's miniasm https://github.com/lh3/miniasm
 	int tl5, tl3, ext5, ext3;
 	int max_hang = 1000;
 	if (strand == '-'){
@@ -98,6 +99,7 @@ void Match::sort_matches(std::vector<Match>& matches)
 
 int Match::check_match_contained()
 {
+	// Adapted from Heng Li's miniasm https://github.com/lh3/miniasm
 	int tl5, tl3, ext5, ext3;
 	int max_hang = 1000;
 	if (strand == '-'){
