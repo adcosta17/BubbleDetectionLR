@@ -614,7 +614,7 @@ int MatchUtils::read_paf_file(std::unordered_map<std::string, std::unordered_map
 	cerr << "Reading in all valid Matches" << endl;
 
 	read_ids.clear();
-	vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", false, use_names_as_is);
+	vector<int> sizes = get_all_matches_for_file(all_matches, matches_indexed, raw_matches, read_ids, read_lengths, file_name, read_classification, to_drop, "", gfa, use_names_as_is);
 
     return accumulate( sizes.begin(), sizes.end(), 0)/sizes.size();
 }
